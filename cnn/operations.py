@@ -1,0 +1,108 @@
+import torch
+import torch.nn as nn
+import torch.nn.functional as F
+
+OPERATIONS = {
+    0: lambda C, stride, affine: SepConv(C, C, 3, stride, 1, affine=affine), # sep conv 3 x 3
+    1: lambda C, stride, affine: SepConv(C, C, 5, stride, 2, affine=affine), # sep conv 5 x 5
+    2: lambda C, stride, affine: nn.AvgPool2d(3, stride=stride, padding=1, count_include_pad=False), # avg pool 3 x 3
+    3: lambda C, stride, affine: nn.MaxPool2d(3, stride=stride, padding=1), # max pool 3x 3
+    4: lambda C, stride, affine: Identity() if stride == 1 else FactorizedReduce(C, C, affine=affine), # identity
+}
+
+
+def drop_path(x, keep_prob):
+    batch_size = x.shape[0]
+    noise_shape = [batch_size, 1, 1, 1]
+    random_tensor = keep_prob
+    random_tensor += torch.rand(noise_shape)
+    binary_tensor = torch.floor(random_tensor)
+    out = torch.div(x, keep_prob) * binary_tensor
+    return out
+
+
+def apply_drop_path(x, drop_path_keep_prob, layer_id, num_layers, step, num_steps):
+    layer_ratio = float(layer_id+1) / (num_layers + 2)
+    drop_path_keep_prob = 1.0 - layer_ratio * (1.0 - drop_path_keep_prob)
+    step_ratio = float(step + 1) / num_steps
+    drop_path_keep_prob = 1.0 - step_ratio * (1.0 - drop_path_keep_prob)
+    out = drop_path(x, drop_path_keep_prob)
+    return out
+
+
+class AuxHead(nn.Module):
+    def __init__(self, C_in):
+        super(AuxHead, self).__init__()
+        self.ops = nn.Sequential(
+            nn.ReLU(inplace=False),
+            nn.AvgPool2d(5, stride=3, padding=0, count_include_pad=False),
+            nn.Conv2d(C_in, 128, 1, bias=False),
+            nn.BatchNorm2d(128),
+            nn.ReLU(inplace=False),
+            nn.Conv2d(128, 768, 2, bias=False),
+            nn.BatchNorm2d(768),
+            nn.ReLU(inplace=False),
+        )
+        self.classifier = nn.Linear(768, 10)
+        
+    def forward(self, x):
+        x = self.ops(x)
+        x = self.classifier(x.view(x.size(0), -1))
+
+
+class ReLUConvBN(nn.Module):
+  def __init__(self, C_in, C_out, kernel_size, stride, padding, affine=True):
+        super(ReLUConvBN, self).__init__()
+        self.op = nn.Sequential(
+            nn.ReLU(inplace=False),
+            nn.Conv2d(C_in, C_out, kernel_size, stride=stride, padding=padding, bias=False),
+            nn.BatchNorm2d(C_out, affine=affine)
+        )
+    
+    def forward(self, x):
+        return self.op(x)
+
+
+class SepConv(nn.Module):
+    def __init__(self, C_in, C_out, kernel_size, stride, padding, affine=True):
+        super(SepConv, self).__init__()
+        self.op = nn.Sequential(
+            nn.ReLU(inplace=False),
+            nn.Conv2d(C_in, C_in, kernel_size=kernel_size, stride=stride, padding=padding, groups=C_in, bias=False),
+            nn.Conv2d(C_in, C_in, kernel_size=1, padding=0, bias=False),
+            nn.BatchNorm2d(C_in, affine=affine),
+            nn.ReLU(inplace=False),
+            nn.Conv2d(C_in, C_in, kernel_size=kernel_size, stride=1, padding=padding, groups=C_in, bias=False),
+            nn.Conv2d(C_in, C_out, kernel_size=1, padding=0, bias=False),
+            nn.BatchNorm2d(C_out, affine=affine),
+        )
+    
+    def forward(self, x):
+        return self.op(x)
+
+
+class Identity(nn.Module):
+    def __init__(self):
+        super(Identity, self).__init__()
+    
+    def forward(self, x):
+        return x
+
+
+class FactorizedReduce(nn.Module):
+    def __init__(self, C_in, C_out, affine=True):
+        super(FactorizedReduce, self).__init__()
+        assert C_out % 2 == 0
+        self.path1 = nn.Sequential(nn.AvgPool2d(1, stride=2, padding=0, count_include_pad=False),
+                                   nn.Conv2d(C_in, C_out // 2, 1, stride=2, padding=0, bias=False))
+        self.path2 = nn.Sequential(nn.AvgPool2d(1, stride=2, padding=1, count_include_pad=False),
+                                   nn.Conv2d(C_in, C_out // 2, 1, stride=2, padding=0, bias=False))
+        self.bn = nn.BatchNorm2d(C_out, affine=affine)
+    
+    def forward(self, x):
+        path1 = x
+        path2 = F.pad(x, (0, 1, 0, 1), "constant", 0)[:, :, 1:, 1:]
+        out = torch.cat([self.path1(path1), self.path1(path2)], dim=1)
+        out = self.bn(out)
+        return out
+    
