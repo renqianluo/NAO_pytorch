@@ -35,7 +35,7 @@ class Node(nn.Module):
         else:
             if x_stride  > 1:
                 assert x_stride == 2
-                self.x_op.add_module('id_fact_reduce', FactorizedReduce(x[-1], out_filters))
+                self.x_op.add_module('id_fact_reduce', FactorizedReduce(x_shape[-1], out_filters))
             if x_shape[-1] != out_filters:
                 self.x_op.add_module('id_conv', ReLUConvBN(x[-1], out_filters, 1, 1, 0))
         x_shape[0], x_shape[1], x_shape[2] = x_shape[0] // stride, x_shape[1] // stride, out_filters
@@ -49,7 +49,7 @@ class Node(nn.Module):
         else:
             if y_stride > 1:
                 assert y_stride == 2
-                self.y_op.add_module('id_fact_reduce', FactorizedReduce(y[-1], out_filters))
+                self.y_op.add_module('id_fact_reduce', FactorizedReduce(y_shape[-1], out_filters))
             if y_shape[-1] != out_filters:
                 self.y_op.add_module('id_conv', ReLUConvBN(y[-1], out_filters, 1, 1, 0))
         y_shape[0], y_shape[1], y_shape[2] = y_shape[0] // stride, y_shape[1] // stride, out_filters
