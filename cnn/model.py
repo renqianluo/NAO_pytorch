@@ -108,7 +108,7 @@ class Cell(nn.Module):
                 self.concat.append(i)
         out_hw = min([shape[0] for i, shape in enumerate(layers) if self.used[i] == 0])
         prev_layers[0], prev_layers[1] = [prev_layers[-1], [out_hw, out_hw, out_filters*len(self.concat)]]
-        self.out_shape = [out_hw, out_hw, out_filters * len(self.used)]
+        self.out_shape = [out_hw, out_hw, out_filters * len(self.concat)]
     
     def forward(self, s0, s1, step):
         s0, s1 = self.maybe_calibrate_size(s0, s1)
