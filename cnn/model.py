@@ -108,12 +108,10 @@ class Cell(nn.Module):
                 self.concat.append(i)
         out_hw = min([shape[0] for i, shape in enumerate(layers) if self.used[i] == 0])
         prev_layers[0], prev_layers[1] = [prev_layers[-1], [out_hw, out_hw, out_filters*len(self.concat)]]
+        self.out_shape = [out_hw, out_hw, out_filters * len(self.used)]
     
     def forward(self, s0, s1, step):
-        if self.preprocess_x is not None:
-            s0 = self.preprocess_x(s0)
-        if self.preprocess_y is not None:
-            s1 = self.preprocess_y(s1)
+        s0, s1 = self.maybe_calibrate_size(s0, s1)
         s1 = self.layer_base(s1)
         states = [s0, s1]
         for i in range(self.num_nodes):
