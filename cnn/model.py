@@ -38,7 +38,7 @@ class Node(nn.Module):
                 self.x_op.add_module('id_fact_reduce', FactorizedReduce(x_shape[-1], out_filters))
             if x_shape[-1] != out_filters:
                 self.x_op.add_module('id_conv', ReLUConvBN(x[-1], out_filters, 1, 1, 0))
-        x_shape[0], x_shape[1], x_shape[2] = x_shape[0] // x_stride, x_shape[1] // x_stride, out_filters
+        out_x_shape = [x_shape[0] // x_stride, x_shape[1] // x_stride, out_filters]
 
         y_stride = stride if y_id in [0, 1] else 1
         if y_op in [0, 1]:
@@ -52,10 +52,10 @@ class Node(nn.Module):
                 self.y_op.add_module('id_fact_reduce', FactorizedReduce(y_shape[-1], out_filters))
             if y_shape[-1] != out_filters:
                 self.y_op.add_module('id_conv', ReLUConvBN(y[-1], out_filters, 1, 1, 0))
-        y_shape[0], y_shape[1], y_shape[2] = y_shape[0] // y_stride, y_shape[1] // y_stride, out_filters
+        out_y_shape = [y_shape[0] // y_stride, y_shape[1] // y_stride, out_filters]
         
-        assert x_shape[0] == y_shape[0] and x_shape[1] == y_shape[1]
-        self.out_shape = [x_shape[0], x_shape[1], x_shape[2]]
+        assert out_x_shape[0] == out_y_shape[0] and out_x_shape[1] == out_y_shape[1]
+        self.out_shape = [out_x_shape[0], out_x_shape[1], out_x_shape[2]]
         
     def forward(self, x, y, step):
         x = self.x_op(x)
@@ -85,7 +85,7 @@ class Cell(nn.Module):
         self.used = [0] * (self.num_nodes + 2)
         
         # maybe calibrate size
-        layers = [prev_layers[0], prev_layers[1]]
+        layers = [list(prev_layers[0]), list(prev_layers[1])]
         self.preprocess_x, self.preprocess_y = None, None
         if layers[0][0] != layers[1][0]:
             assert layers[0][0] == 2 * layers[1][0]
@@ -93,7 +93,7 @@ class Cell(nn.Module):
             layers[0] = [layers[1][0], layers[1][1], out_filters]
         elif layers[0][-1] != out_filters:
             self.preprocess_x = ReLUConvBN(layers[0][-1], out_filters, 1, 1, 0)
-            layers = [layers[0][0], layers[0][1], out_filters]
+            layers[0] = [layers[0][0], layers[0][1], out_filters]
         if layers[1][-1] != out_filters:
             self.preprocess_y = ReLUConvBN(layers[1][-1], out_filters, 1, 1, 0)
             layers[1][-1] = out_filters
