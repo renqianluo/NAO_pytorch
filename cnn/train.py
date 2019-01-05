@@ -120,6 +120,10 @@ def main():
     
     model = NASNetwork(args.layers, args.nodes, args.channels, args.keep_prob, args.drop_path_keep_prob, args.use_aux_head, args.steps, args.arch)
     model = model.cuda()
+    if torch.cuda.device_count() > 1:
+        logging.info("Use ", torch.cuda.device_count(), "GPUs !")
+        model = nn.DataParallel(model)
+    
     logging.info("param size = %fMB", utils.count_parameters_in_MB(model))
     optimizer = torch.optim.SGD(
         model.parameters(),
