@@ -23,7 +23,7 @@ parser.add_argument('--mode', type=str, default='train',
                     choices=['train', 'test'])
 parser.add_argument('--data_path', type=str, default='/tmp/cifar10_data')
 parser.add_argument('--output_dir', type=str, default='models')
-parser.add_argument('--batch_size', type=int, default=128)
+parser.add_argument('--batch_size', type=int, default=160)
 parser.add_argument('--eval_batch_size', type=int, default=500)
 parser.add_argument('--num_epochs', type=int, default=600)
 parser.add_argument('--num_layers', type=int, default=5)
@@ -115,7 +115,7 @@ def main():
     cudnn.enabled = True
     torch.cuda.manual_seed(args.seed)
     
-    args.num_steps = np.ceil(args.num_epochs * 50000 / args.batch_size)
+    args.num_steps = int(np.ceil(50000 / args.batch_size)) * args.num_epochs
     
     logging.info("Args = %s", args)
     
