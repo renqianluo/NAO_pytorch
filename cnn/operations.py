@@ -12,24 +12,16 @@ OPERATIONS = {
     4: lambda C, stride, affine: Identity(), # identity
 }
 
-
-
-def drop_path(x, keep_prob):
-    if keep_prob < 1.:
-        noise_shape = [x.size(0), 1, 1, 1]
-        mask = Variable(torch.cuda.FloatTensor(*noise_shape).bernoulli_(keep_prob))
-        x.div_(keep_prob)
-        x.mul_(mask)
-    return x
-
-
 def apply_drop_path(x, drop_path_keep_prob, layer_id, num_layers, step, num_steps):
     layer_ratio = float(layer_id+1) / (num_layers)
     drop_path_keep_prob = 1.0 - layer_ratio * (1.0 - drop_path_keep_prob)
     step_ratio = float(step + 1) / num_steps
     drop_path_keep_prob = 1.0 - step_ratio * (1.0 - drop_path_keep_prob)
-    out = drop_path(x, drop_path_keep_prob)
-    return out
+    if drop_path_keep_prob < 1.:
+        noise_shape = [x.size(0), 1, 1, 1]
+        mask = Variable(torch.cuda.FloatTensor(*noise_shape).bernoulli_(drop_path_keep_prob))
+        x = x / drop_path_keep_prob * mask
+    return x
 
 
 class AuxHead(nn.Module):
