@@ -103,7 +103,7 @@ def save(model_path, args, model, epoch, step, optimizer):
     }
     filename = os.path.join(model_path, 'checkpoint{}.pt'.format(epoch))
     newest_filename = os.path.join(model_path, 'checkpoint.pt')
-    torch.save(state_dict, model_path)
+    torch.save(state_dict, filename)
     shutil.copyfile(filename, newest_filename)
   
 
