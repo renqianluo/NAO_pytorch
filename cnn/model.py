@@ -12,10 +12,10 @@ import utils
     
 
 class Node(nn.Module):
-    def __init__(self, x_id, x_op, y_id, y_op, x_c, y_c, C_curr, stride=1, drop_path_keep_prob=None,
+    def __init__(self, x_id, x_op, y_id, y_op, x, y, out_filters, stride=1, drop_path_keep_prob=None,
                  layer_id=0, num_layers=0, num_steps=0):
         super(Node, self).__init__()
-        self.C = C_curr
+        self.out_filters = out_filters
         self.stride = stride
         self.drop_path_keep_prob = drop_path_keep_prob
         self.layer_id = layer_id
@@ -23,34 +23,34 @@ class Node(nn.Module):
         self.num_steps = num_steps
         self.x_id = x_id
         self.y_id = y_id
-        self.x_op = nn.Sequential(OPERATIONS[x_op](C_curr, stride, True))
-        self.y_op = nn.Sequential(OPERATIONS[y_op](C_curr, stride, True))
+        self.x_op = nn.Sequential(OPERATIONS[x_op](out_filters, stride, True))
+        self.y_op = nn.Sequential(OPERATIONS[y_op](out_filters, stride, True))
         
         x_stride = stride if x_id in [0, 1] else 1
         if x_op in [0, 1]:
             pass
         elif x_op in [2, 3]:
-            if x_c != C_curr:
-                self.x_op.add_module('pool_conv', ReLUConvBN(x_c, C_curr, 1, 1, 0))
+            if x[-1] != out_filters:
+                self.x_op.add_module('pool_conv', ReLUConvBN(x[-1], out_filters, 1, 1, 0))
         else:
             if x_stride  > 1:
                 assert x_stride == 2
-                self.x_op.add_module('id_fact_reduce', FactorizedReduce(x_c, C_curr))
-            if x_c != C_curr:
-                self.x_op.add_module('id_conv', ReLUConvBN(x_c, C_curr, 1, 1, 0))
+                self.x_op.add_module('id_fact_reduce', FactorizedReduce(x[-1], out_filters))
+            if x[-1] != out_filters:
+                self.x_op.add_module('id_conv', ReLUConvBN(x[-1], out_filters, 1, 1, 0))
 
         y_stride = stride if y_id in [0, 1] else 1
         if y_op in [0, 1]:
             pass
         elif y_op in [2, 3]:
-            if y_c != C_curr:
-                self.y_op.add_module('pool_conv', ReLUConvBN(y_c, C_curr, 1, 1, 0))
+            if y[-1] != out_filters:
+                self.y_op.add_module('pool_conv', ReLUConvBN(y[-1], out_filters, 1, 1, 0))
         else:
             if y_stride > 1:
                 assert y_stride == 2
-                self.y_op.add_module('id_fact_reduce', FactorizedReduce(y_c, C_curr))
-            if y_c != C_curr:
-                self.y_op.add_module('id_conv', ReLUConvBN(y_c, C_curr, 1, 1, 0))
+                self.y_op.add_module('id_fact_reduce', FactorizedReduce(y[-1], out_filters))
+            if y[-1] != out_filters:
+                self.y_op.add_module('id_conv', ReLUConvBN(y[-1], out_filters, 1, 1, 0))
         
     def forward(self, x, y, step):
         x = self.x_op(x)
@@ -65,12 +65,12 @@ class Node(nn.Module):
     
 
 class Cell(nn.Module):
-    def __init__(self, arch, C_prev_prev, C_prev, C, reduction, reduction_prev, layer_id, num_layers, num_steps, drop_path_keep_prob=None):
+    def __init__(self, arch, layers, out_filters, reduction, layer_id, num_layers, num_steps, drop_path_keep_prob=None):
         super(Cell, self).__init__()
-        print(C_prev_prev, C_prev, C)
+        print(layers)
+        assert len(layers) == 2
         self.arch = arch
         self.reduction = reduction
-        self.reduction_prev = reduction_prev
         self.layer_id = layer_id
         self.num_layers = num_layers
         self.num_steps = num_steps
@@ -81,20 +81,32 @@ class Cell(nn.Module):
         
         # maybe calibrate size
         self.preprocess_x, self.preprocess_y = None, None
-        if reduction_prev: # hw[0] != hw[1]
-            self.preprocess_x = nn.Sequential(nn.ReLU(), FactorizedReduce(C_prev_prev, C))
-        elif C_prev_prev != C:
-            self.preprocess_x = ReLUConvBN(C_prev_prev, C, 1, 1, 0)
-        if C_prev != C:
-            self.preprocess_y = ReLUConvBN(C_prev, C, 1, 1, 0)
+        if layers[0][0] != layers[1][0]:
+            assert layers[0][0] == 2 * layers[1][0]
+            self.preprocess_x = nn.Sequential(nn.ReLU(), FactorizedReduce(layers[0][-1], out_filters))
+            layers[0] = [layers[1][0], layers[1][1], out_filters]
+        elif layers[0][-1] != out_filters:
+            self.preprocess_x = ReLUConvBN(layers[0][-1], out_filters, 1, 1, 0)
+            layers[0][-1] = out_filters
+        if layers[1][-1] != out_filters:
+            self.preprocess_y = ReLUConvBN(layers[1][-1], out_filters, 1, 1, 0)
+            layers[1][-1] = out_filters
+            
+        self.layer_base = ReLUConvBN(layers[1][-1], out_filters, 1, 1, 0)
+        layers[1][-1] = out_filters
         
         stride = 2 if self.reduction else 1
+        shapes = [layers[0], layers[1]]
         for i in range(self.num_nodes):
             x_id, x_op, y_id, y_op = arch[4*i], arch[4*i+1], arch[4*i+2], arch[4*i+3]
-            node = Node(x_id, x_op, y_id, y_op, C, C, C, stride, drop_path_keep_prob, layer_id, num_layers, num_steps)
+            x_shape, y_shape = shapes[x_id], shapes[y_id]
+            node = Node(x_id, x_op, y_id, y_op, x_shape, y_shape, out_filters, stride, drop_path_keep_prob, layer_id, num_layers, num_steps)
             self.ops.append(node)
             self.used[x_id] += 1
             self.used[y_id] += 1
+            shapes.append([x_shape[0]//stride, x_shape[1]//stride, out_filters])
+        out_hw = min([shape[0] for i, shape in enumerate(shapes) if self.used[i] == 0])
+        layers[0], layers[1] = [layers[-1], [out_hw, out_hw, out_filters]]
         self.concat = []
         for i, c in enumerate(self.used):
             if self.used[i] == 0:
@@ -106,6 +118,7 @@ class Cell(nn.Module):
             s0 = self.preprocess_x(s0)
         if self.preprocess_y is not None:
             s1 = self.preprocess_y(s1)
+        s1 = self.layer_base(s1)
         states = [s0, s1]
         for i in range(self.num_nodes):
             x_id = self.arch[4*i]
@@ -122,7 +135,7 @@ class NASNetwork(nn.Module):
         super(NASNetwork, self).__init__()
         self.num_layers = num_layers
         self.num_nodes = num_nodes
-        self.C = out_filters
+        self.out_filters = out_filters
         self.keep_prob = keep_prob
         self.drop_path_keep_prob = drop_path_keep_prob
         self.use_aux_head = use_aux_head
@@ -131,40 +144,37 @@ class NASNetwork(nn.Module):
         self.conv_arch = arch[:4 * self.num_nodes]
         self.reduc_arch = arch[4 * self.num_nodes:]
         self.criterion = nn.CrossEntropyLoss().cuda()
-
+        
         self.num_layers = self.num_layers * 3
         pool_distance = self.num_layers // 3
         self.pool_layers = [pool_distance, 2 * pool_distance + 1]
         if self.use_aux_head:
             self.aux_head_index = self.pool_layers[-1] #+ 1
         stem_multiplier = 3
-        C_curr = stem_multiplier * self.C
+        out_filters = stem_multiplier * self.C
         self.stem = nn.Sequential(
-            nn.Conv2d(3, C_curr, 3, padding=1, bias=False),
-            nn.BatchNorm2d(C_curr)
+            nn.Conv2d(3, out_filters, 3, padding=1, bias=False),
+            nn.BatchNorm2d(out_filters)
         )
-        
-        C_prev_prev, C_prev, C_curr = C_curr, C_curr, self.C
+        layers = [[32,32,out_filters],[32,32,out_filters]]
+        out_filters = self.out_filters
         self.cells = nn.ModuleList()
-        reduction_prev = False
         for i in range(self.num_layers+2):
             if i not in self.pool_layers:
-                cell = Cell(self.conv_arch, C_prev_prev, C_prev, C_curr, False, reduction_prev, i, self.num_layers+2, self.num_steps, self.drop_path_keep_prob)
+                cell = Cell(self.conv_arch, layers, out_filters, False, i, self.num_layers+2, self.num_steps, self.drop_path_keep_prob)
                 reduction_prev = False
             else:
-                C_curr *= 2
-                cell = Cell(self.reduc_arch, C_prev_prev, C_prev, C_curr, True, reduction_prev, i, self.num_layers+2, self.num_steps, self.drop_path_keep_prob)
-                reduction_prev = True
+                out_filters *= 2
+                cell = Cell(self.reduc_arch, layers, out_filters, True, i, self.num_layers+2, self.num_steps, self.drop_path_keep_prob)
             self.cells.append(cell)
-            C_prev_prev, C_prev = C_prev, C_curr
             
             if self.use_aux_head and i == self.aux_head_index:
-                self.aux_head = AuxHead(C_curr)
+                self.aux_head = AuxHead(layers[-1][-1])
         
         self.relu = nn.ReLU(inplace=False)
         self.global_pooling = nn.AdaptiveAvgPool2d(1)
         self.dropout = nn.Dropout(1 - self.keep_prob)
-        self.classifier = nn.Linear(C_prev, 10)
+        self.classifier = nn.Linear(layers[-1][-1], 10)
         
     
     def forward(self, input, step):
