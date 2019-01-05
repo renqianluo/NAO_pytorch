@@ -70,10 +70,10 @@ class Node(nn.Module):
     
 
 class Cell(nn.Module):
-    def __init__(self, arch, layers, out_filters, reduction, layer_id, num_layers, num_steps, drop_path_keep_prob=None):
+    def __init__(self, arch, prev_layers, out_filters, reduction, layer_id, num_layers, num_steps, drop_path_keep_prob=None):
         super(Cell, self).__init__()
-        print(layers)
-        assert len(layers) == 2
+        print(prev_layers)
+        assert len(prev_layers) == 2
         self.arch = arch
         self.reduction = reduction
         self.layer_id = layer_id
@@ -85,6 +85,7 @@ class Cell(nn.Module):
         self.used = [0] * (self.num_nodes + 2)
         
         # maybe calibrate size
+        layers = [prev_layers[0], prev_layers[1]]
         self.preprocess_x, self.preprocess_y = None, None
         if layers[0][0] != layers[1][0]:
             assert layers[0][0] == 2 * layers[1][0]
@@ -92,7 +93,7 @@ class Cell(nn.Module):
             layers[0] = [layers[1][0], layers[1][1], out_filters]
         elif layers[0][-1] != out_filters:
             self.preprocess_x = ReLUConvBN(layers[0][-1], out_filters, 1, 1, 0)
-            layers[0][-1] = out_filters
+            layers = [layers[0][0], layers[0][1], out_filters]
         if layers[1][-1] != out_filters:
             self.preprocess_y = ReLUConvBN(layers[1][-1], out_filters, 1, 1, 0)
             layers[1][-1] = out_filters
@@ -111,7 +112,7 @@ class Cell(nn.Module):
             self.used[y_id] += 1
             shapes.append(node.out_shape)
         out_hw = min([shape[0] for i, shape in enumerate(shapes) if self.used[i] == 0])
-        layers[0], layers[1] = [layers[-1], [out_hw, out_hw, out_filters]]
+        prev_layers[0], prev_layers[1] = [prev_layers[-1], [out_hw, out_hw, out_filters]]
         self.concat = []
         for i, c in enumerate(self.used):
             if self.used[i] == 0:
@@ -167,7 +168,6 @@ class NASNetwork(nn.Module):
         for i in range(self.num_layers+2):
             if i not in self.pool_layers:
                 cell = Cell(self.conv_arch, layers, out_filters, False, i, self.num_layers+2, self.num_steps, self.drop_path_keep_prob)
-                reduction_prev = False
             else:
                 out_filters *= 2
                 cell = Cell(self.reduc_arch, layers, out_filters, True, i, self.num_layers+2, self.num_steps, self.drop_path_keep_prob)
