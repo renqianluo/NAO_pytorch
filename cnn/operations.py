@@ -96,15 +96,15 @@ class FactorizedReduce(nn.Module):
         super(FactorizedReduce, self).__init__()
         assert C_out % 2 == 0
         self.path1 = nn.Sequential(nn.AvgPool2d(1, stride=2, padding=0, count_include_pad=False),
-                                   nn.Conv2d(C_in, C_out // 2, 1, stride=2, padding=0, bias=False))
-        self.path2 = nn.Sequential(nn.AvgPool2d(1, stride=2, padding=1, count_include_pad=False),
-                                   nn.Conv2d(C_in, C_out // 2, 1, stride=2, padding=0, bias=False))
+                                   nn.Conv2d(C_in, C_out // 2, 1, bias=False))
+        self.path2 = nn.Sequential(nn.AvgPool2d(1, stride=2, padding=0, count_include_pad=False),
+                                   nn.Conv2d(C_in, C_out // 2, 1, bias=False))
         self.bn = nn.BatchNorm2d(C_out, affine=affine)
     
     def forward(self, x):
         path1 = x
         path2 = F.pad(x, (0, 1, 0, 1), "constant", 0)[:, :, 1:, 1:]
-        out = torch.cat([self.path1(path1), self.path1(path2)], dim=1)
+        out = torch.cat([self.path1(path1), self.path2(path2)], dim=1)
         out = self.bn(out)
         return out
 
