@@ -135,16 +135,14 @@ def main():
         train_data, batch_size=args.batch_size, shuffle=True, pin_memory=True, num_workers=16)
     valid_queue = torch.utils.data.DataLoader(
         valid_data, batch_size=args.batch_size, shuffle=False, pin_memory=True, num_workers=16)
-    scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, float(args.num_epochs))
     
-    _, model_state_dict, epoch, step, scheduler_state_dict, optimizer_state_dict = utils.load(args.output_dir)
+    _, model_state_dict, epoch, step, optimizer_state_dict = utils.load(args.output_dir)
     if model_state_dict is not None:
         model.load_state_dict(model_state_dict)
-    if scheduler_state_dict is not None:
-        scheduler.load_state_dict(scheduler_state_dict)
     if optimizer_state_dict is not None:
         optimizer.load_state_dict(optimizer_state_dict)
-     
+
+    scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, float(args.num_epochs), args.lr_min, epoch)
     while epoch < args.num_epochs:
         scheduler.step()
         logging.info('epoch %d lr %e', epoch, scheduler.get_lr()[0])
@@ -153,7 +151,7 @@ def main():
         valid_acc, valid_obj = valid(valid_queue, model)
         logging.info('valid_acc %f', valid_acc)
         epoch += 1
-        utils.save(args.output_dir, args, model, epoch, step, scheduler, optimizer)
+        utils.save(args.output_dir, args, model, epoch, step, optimizer)
         
 
 if __name__ == '__main__':

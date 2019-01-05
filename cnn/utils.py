@@ -93,13 +93,12 @@ def save_checkpoint(state, is_best, save):
         shutil.copyfile(filename, best_filename)
       
 
-def save(model_path, args, model, epoch, step, lr_scheduler, optimizer):
+def save(model_path, args, model, epoch, step, optimizer):
     state_dict = {
         'args': args,
         'model': model.state_dict() if model else {},
         'epoch': epoch,
         'step': step,
-        'lr_scheduler': lr_scheduler.state_dict(),
         'optimizer': optimizer.state_dict()
     }
     filename = os.path.join(model_path, 'checkpoint{}.pt'.format(epoch))
@@ -117,9 +116,8 @@ def load(model_path):
     model_state_dict = state_dict['model']
     epoch = state_dict['epoch']
     step = state_dict['step']
-    lr_scheduler_state_dict = state_dict['lr_scheduler']
     optimizer_state_dict = state_dict['optimizer']
-    return args, model_state_dict, epoch, step, lr_scheduler_state_dict, optimizer_state_dict
+    return args, model_state_dict, epoch, step, optimizer_state_dict
 
   
 def create_exp_dir(path, scripts_to_save=None):
