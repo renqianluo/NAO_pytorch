@@ -50,6 +50,7 @@ class AuxHead(nn.Module):
     def forward(self, x):
         x = self.ops(x)
         x = self.classifier(x.view(x.size(0), -1))
+        return x
 
 
 class ReLUConvBN(nn.Module):

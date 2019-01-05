@@ -77,7 +77,7 @@ class Node(nn.Module):
         y = self.y_op(y)
         if self.y_id in [0, 1, 2, 3] and self.drop_path_keep_prob is not None and self.training:
             y = apply_drop_path(y, self.drop_path_keep_prob, self.layer_id, self.num_layers, step, self.num_steps)
-        print(x.shape,y.shape,self.x_id,self.y_id,self.x_op,self.y_op)
+        #print(x.shape,y.shape,self.x_id,self.y_id,self.x_op,self.y_op)
         out = x + y
         return out
     
@@ -188,7 +188,7 @@ class NASNetwork(nn.Module):
         s0 = s1 = self.stem(input)
         for i, cell in enumerate(self.cells):
             s0, s1 = s1, cell(s0, s1, step)
-            if i == self.aux_head_index and self.use_aux_head and self.training:
+            if self.use_aux_head and i == self.aux_head_index and self.training:
                 aux_logits = self.aux_head(s1)
         out = self.relu(s1)
         out = self.global_pooling(out)

@@ -60,7 +60,7 @@ def train(train_queue, model, optimizer, global_step):
         logits, aux_logits = model(input, global_step)
         global_step += 1
         loss = model.loss(logits, target)
-        if not aux_logits:
+        if aux_logits is not None:
             aux_loss = model.loss(aux_logits, target)
             loss += 0.4 * aux_loss
         loss.backward()
