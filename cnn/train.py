@@ -25,19 +25,20 @@ parser.add_argument('--data_path', type=str, default='/tmp/cifar10_data')
 parser.add_argument('--output_dir', type=str, default='models')
 parser.add_argument('--batch_size', type=int, default=160)
 parser.add_argument('--eval_batch_size', type=int, default=500)
-parser.add_argument('--num_epochs', type=int, default=600)
-parser.add_argument('--num_layers', type=int, default=5)
-parser.add_argument('--num_nodes', type=int, default=5)
-parser.add_argument('--out_filters', type=int, default=36)
+parser.add_argument('--epochs', type=int, default=600)
+parser.add_argument('--layers', type=int, default=5)
+parser.add_argument('--nodes', type=int, default=5)
+parser.add_argument('--channels', type=int, default=36)
 parser.add_argument('--cutout_size', type=int, default=None)
 parser.add_argument('--grad_bound', type=float, default=5.0)
 parser.add_argument('--lr_max', type=float, default=0.025)
 parser.add_argument('--lr_min', type=float, default=0)
-parser.add_argument('--keep_prob', type=float, default=0.5)
-parser.add_argument('--drop_path_keep_prob', type=float, default=1.0)
+parser.add_argument('--keep_prob', type=float, default=0.6)
+parser.add_argument('--drop_path_keep_prob', type=float, default=0.8)
 parser.add_argument('--l2_reg', type=float, default=3e-4)
 parser.add_argument('--arch', type=str, default=None)
 parser.add_argument('--use_aux_head', action='store_true', default=False)
+parser.add_argument('--')
 parser.add_argument('--seed', type=int, default=None)
 args = parser.parse_args()
 
@@ -113,11 +114,11 @@ def main():
     cudnn.enabled = True
     torch.cuda.manual_seed(args.seed)
     
-    args.num_steps = int(np.ceil(50000 / args.batch_size)) * args.num_epochs
+    args.steps = int(np.ceil(50000 / args.batch_size)) * args.epochs
     
     logging.info("Args = %s", args)
     
-    model = NASNetwork(args.num_layers, args.num_nodes, args.out_filters, args.keep_prob, args.drop_path_keep_prob, args.use_aux_head, args.num_steps, args.arch)
+    model = NASNetwork(args.layers, args.nodes, args.channels, args.keep_prob, args.drop_path_keep_prob, args.use_aux_head, args.steps, args.arch)
     model = model.cuda()
     logging.info("param size = %fMB", utils.count_parameters_in_MB(model))
     optimizer = torch.optim.SGD(
@@ -140,8 +141,8 @@ def main():
     if optimizer_state_dict is not None:
         optimizer.load_state_dict(optimizer_state_dict)
 
-    scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, float(args.num_epochs), args.lr_min, epoch-1)
-    while epoch < args.num_epochs:
+    scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, float(args.epochs), args.lr_min, epoch-1)
+    while epoch < args.epochs:
         scheduler.step()
         logging.info('epoch %d lr %e', epoch, scheduler.get_lr()[0])
         train_acc, train_obj, step = train(train_queue, model, optimizer, step)
