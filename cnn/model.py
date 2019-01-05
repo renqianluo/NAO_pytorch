@@ -182,6 +182,12 @@ class NASNetwork(nn.Module):
         self.dropout = nn.Dropout(1 - self.keep_prob)
         self.classifier = nn.Linear(outs[-1][-1], 10)
         
+        self.init_parameters()
+    
+    def init_parameters(self):
+        for w in self.parameters():
+            if w.data.dim() >= 2:
+                nn.init.kaiming_normal(w.weight.data)
     
     def forward(self, input, step=None):
         aux_logits = None
