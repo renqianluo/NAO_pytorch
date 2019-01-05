@@ -186,7 +186,7 @@ class NASNetwork(nn.Module):
     
     def init_parameters(self):
         for w in self.parameters():
-            if w.data.dim() >= 2:
+            if w.data.dim() == 4:
                 nn.init.kaiming_normal(w.weight.data)
     
     def forward(self, input, step=None):
