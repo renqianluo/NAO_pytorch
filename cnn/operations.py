@@ -12,10 +12,10 @@ OPERATIONS = {
     4: lambda C, stride, affine: Identity(), # identity
 }
 
-def apply_drop_path(x, drop_path_keep_prob, layer_id, num_layers, step, num_steps):
-    layer_ratio = float(layer_id+1) / (num_layers)
+def apply_drop_path(x, drop_path_keep_prob, layer_id, layers, step, steps):
+    layer_ratio = float(layer_id+1) / (layers)
     drop_path_keep_prob = 1.0 - layer_ratio * (1.0 - drop_path_keep_prob)
-    step_ratio = float(step + 1) / num_steps
+    step_ratio = float(step + 1) / steps
     drop_path_keep_prob = 1.0 - step_ratio * (1.0 - drop_path_keep_prob)
     if drop_path_keep_prob < 1.:
         noise_shape = [x.size(0), 1, 1, 1]

@@ -98,28 +98,28 @@ class Cell(nn.Module):
         self.used = [0] * (self.nodes + 2)
         
         # maybe calibrate size
-        layers = [list(prev_layers[0]), list(prev_layers[1])]
-        self.maybe_calibrate_size = MaybeCalibrateSize(layers, channels)
-        layers = self.maybe_calibrate_size.out_shape
+        prev_layers = [list(prev_layers[0]), list(prev_layers[1])]
+        self.maybe_calibrate_size = MaybeCalibrateSize(prev_layers, channels)
+        prev_layers = self.maybe_calibrate_size.out_shape
 
-        self.layer_base = ReLUConvBN(layers[1][-1], channels, 1, 1, 0)
-        layers[1][-1] = channels
+        self.layer_base = ReLUConvBN(prev_layers[1][-1], channels, 1, 1, 0)
+        prev_layers[1][-1] = channels
         
         stride = 2 if self.reduction else 1
         for i in range(self.nodes):
             x_id, x_op, y_id, y_op = arch[4*i], arch[4*i+1], arch[4*i+2], arch[4*i+3]
-            x_shape, y_shape = layers[x_id], layers[y_id]
+            x_shape, y_shape = prev_layers[x_id], prev_layers[y_id]
             node = Node(x_id, x_op, y_id, y_op, x_shape, y_shape, channels, stride, drop_path_keep_prob, layer_id, layers, steps)
             self.ops.append(node)
             self.used[x_id] += 1
             self.used[y_id] += 1
-            layers.append(node.out_shape)
+            prev_layers.append(node.out_shape)
         
         self.concat = []
         for i, c in enumerate(self.used):
             if self.used[i] == 0:
                 self.concat.append(i)
-        out_hw = min([shape[0] for i, shape in enumerate(layers) if self.used[i] == 0])
+        out_hw = min([shape[0] for i, shape in enumerate(prev_layers) if self.used[i] == 0])
         self.out_shape = [out_hw, out_hw, channels * len(self.concat)]
     
     def forward(self, s0, s1, step):
