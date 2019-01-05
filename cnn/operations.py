@@ -51,7 +51,7 @@ class AuxHead(nn.Module):
 
 
 class ReLUConvBN(nn.Module):
-  def __init__(self, C_in, C_out, kernel_size, stride, padding, affine=True):
+    def __init__(self, C_in, C_out, kernel_size, stride, padding, affine=True):
         super(ReLUConvBN, self).__init__()
         self.op = nn.Sequential(
             nn.ReLU(inplace=False),
@@ -105,4 +105,3 @@ class FactorizedReduce(nn.Module):
         out = torch.cat([self.path1(path1), self.path1(path2)], dim=1)
         out = self.bn(out)
         return out
-    
