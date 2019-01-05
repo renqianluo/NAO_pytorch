@@ -183,7 +183,7 @@ class NASNetwork(nn.Module):
         self.classifier = nn.Linear(layers[-1][-1], 10)
         
     
-    def forward(self, input, step):
+    def forward(self, input, step=None):
         aux_logits = None
         s0 = s1 = self.stem(input)
         for i, cell in enumerate(self.cells):
