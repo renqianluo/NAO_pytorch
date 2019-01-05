@@ -93,11 +93,12 @@ def save_checkpoint(state, is_best, save):
         shutil.copyfile(filename, best_filename)
       
 
-def save(model_path, args, model, epoch, lr_scheduler, optimizer):
+def save(model_path, args, model, epoch, step, lr_scheduler, optimizer):
     state_dict = {
         'args': args,
         'model': model.state_dict() if model else {},
         'epoch': epoch,
+        'step': step,
         'lr_scheduler': lr_scheduler.state_dict(),
         'optimizer': optimizer.state_dict()
     }
@@ -110,14 +111,15 @@ def save(model_path, args, model, epoch, lr_scheduler, optimizer):
 def load(model_path):
     newest_filename = os.path.join(model_path, 'checkpoint.pt')
     if not os.path.exists(newest_filename):
-        return None, None, 0, None, None
+        return None, None, 0, 0, None, None
     state_dict = torch.load(newest_filename)
     args = state_dict['args']
     model_state_dict = state_dict['model']
     epoch = state_dict['epoch']
+    step = state_dict['step']
     lr_scheduler_state_dict = state_dict['lr_scheduler']
     optimizer_state_dict = state_dict['optimizer']
-    return args, model_state_dict, epoch, lr_scheduler_state_dict, optimizer_state_dict
+    return args, model_state_dict, epoch, step, lr_scheduler_state_dict, optimizer_state_dict
 
   
 def create_exp_dir(path, scripts_to_save=None):

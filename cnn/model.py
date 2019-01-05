@@ -23,34 +23,34 @@ class Node(nn.Module):
         self.num_steps = num_steps
         self.x_id = x_id
         self.y_id = y_id
-        self.x_op = nn.Sequential(OPERATIONS[x_op])
-        self.y_op = nn.Sequential(OPERATIONS[y_op])
+        self.x_op = nn.Sequential(OPERATIONS[x_op](C_curr, stride, True))
+        self.y_op = nn.Sequential(OPERATIONS[y_op](C_curr, stride, True))
         
         x_stride = stride if x_id in [0, 1] else 1
         if x_op in [0, 1]:
             pass
         elif x_op in [2, 3]:
             if x_c != C_curr:
-                self.x_op.add_module(ReLUConvBN(x_c, C_curr, 1, 1, 0))
+                self.x_op.add_module('pool_conv', ReLUConvBN(x_c, C_curr, 1, 1, 0))
         else:
             if x_stride  > 1:
                 assert x_stride == 2
-                self.x_op.add_module(FactorizedReduc(x_c, C_curr))
+                self.x_op.add_module('id_fact_reduce', FactorizedReduce(x_c, C_curr))
             if x_c != C_curr:
-                self.x_op.add_module(ReLUConvBN(x_c, C_curr, 1, 1, 0))
+                self.x_op.add_module('id_conv', ReLUConvBN(x_c, C_curr, 1, 1, 0))
 
         y_stride = stride if y_id in [0, 1] else 1
         if y_op in [0, 1]:
             pass
         elif y_op in [2, 3]:
             if y_c != C_curr:
-                self.y_op.add_module(ReLUConvBN(y_c, C_curr, 1, 1, 0))
+                self.y_op.add_module('pool_conv', ReLUConvBN(y_c, C_curr, 1, 1, 0))
         else:
             if y_stride > 1:
                 assert y_stride == 2
-                self.y_op.add_module(FactorizedReduc(y_c, C_curr))
+                self.y_op.add_module('id_fact_reduce', FactorizedReduce(y_c, C_curr))
             if y_c != C_curr:
-                self.y_op.add_module(ReLUConvBN(y_c, C_curr, 1, 1, 0))
+                self.y_op.add_module('id_conv', ReLUConvBN(y_c, C_curr, 1, 1, 0))
         
     def forward(self, x, y, step):
         x = self.x_op(x)
@@ -59,6 +59,7 @@ class Node(nn.Module):
         y = self.y_op(y)
         if self.y_id in [0, 1, 2, 3] and self.drop_path_keep_prob is not None and self.training:
             y = apply_drop_path(y, self.drop_path_keep_prob, self.layer_id, self.num_layers, step, self.num_steps)
+        print(x.shape,y.shape,self.x_id,self.y_id,self.x_op,self.y_op)
         out = x + y
         return out
     
@@ -81,7 +82,7 @@ class Cell(nn.Module):
         # maybe calibrate size
         self.preprocess_x, self.preprocess_y = None, None
         if reduction_prev: # hw[0] != hw[1]
-            self.preprocess_x = nn.Sequential(nn.ReLU, FactorizedReduce(C_prev_prev, C))
+            self.preprocess_x = nn.Sequential(nn.ReLU(), FactorizedReduce(C_prev_prev, C))
         elif C_prev_prev != C:
             self.preprocess_x = ReLUConvBN(C_prev_prev, C, 1, 1, 0)
         if C_prev != C:
@@ -95,14 +96,15 @@ class Cell(nn.Module):
             self.used[x_id] += 1
             self.used[y_id] += 1
         self.concat = []
-        for i in range(self.num_nodes):
+        for i, c in enumerate(self.used):
             if self.used[i] == 0:
                 self.concat.append(i)
+
     
     def forward(self, s0, s1, step):
-        if not self.preprocess_x:
+        if self.preprocess_x is not None:
             s0 = self.preprocess_x(s0)
-        if not self.preprocess_y:
+        if self.preprocess_y is not None:
             s1 = self.preprocess_y(s1)
         states = [s0, s1]
         for i in range(self.num_nodes):
@@ -125,7 +127,9 @@ class NASNetwork(nn.Module):
         self.drop_path_keep_prob = drop_path_keep_prob
         self.use_aux_head = use_aux_head
         self.num_steps = num_steps
-        self.conv_arch, self.reduc_arch = arch
+        arch = list(map(int, arch.strip().split()))
+        self.conv_arch = arch[:4 * self.num_nodes]
+        self.reduc_arch = arch[4 * self.num_nodes:]
         self.criterion = nn.CrossEntropyLoss().cuda()
 
         self.num_layers = self.num_layers * 3
@@ -163,11 +167,11 @@ class NASNetwork(nn.Module):
         self.classifier = nn.Linear(C_prev, 10)
         
     
-    def forward(self, input):
+    def forward(self, input, step):
         aux_logits = None
         s0 = s1 = self.stem(input)
         for i, cell in enumerate(self.cells):
-            s0, s1 = s1, cell(s0, s1)
+            s0, s1 = s1, cell(s0, s1, step)
             if i == self.aux_head_index and self.use_aux_head and self.training:
                 aux_logits = self.aux_head(s1)
         out = self.relu(s1)

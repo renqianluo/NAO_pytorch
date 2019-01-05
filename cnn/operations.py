@@ -1,6 +1,8 @@
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+from torch.autograd import Variable
+
 
 OPERATIONS = {
     0: lambda C, stride, affine: SepConv(C, C, 3, stride, 1, affine=affine), # sep conv 3 x 3
@@ -12,17 +14,16 @@ OPERATIONS = {
 
 
 def drop_path(x, keep_prob):
-    batch_size = x.shape[0]
-    noise_shape = [batch_size, 1, 1, 1]
-    random_tensor = keep_prob
-    random_tensor += torch.rand(noise_shape)
-    binary_tensor = torch.floor(random_tensor)
-    out = torch.div(x, keep_prob) * binary_tensor
-    return out
+    if keep_prob < 1.:
+        noise_shape = [x.size(0), 1, 1, 1]
+        mask = Variable(torch.cuda.FloatTensor(*noise_shape).bernoulli_(keep_prob))
+        x.div_(keep_prob)
+        x.mul_(mask)
+    return x
 
 
 def apply_drop_path(x, drop_path_keep_prob, layer_id, num_layers, step, num_steps):
-    layer_ratio = float(layer_id+1) / (num_layers + 2)
+    layer_ratio = float(layer_id+1) / (num_layers)
     drop_path_keep_prob = 1.0 - layer_ratio * (1.0 - drop_path_keep_prob)
     step_ratio = float(step + 1) / num_steps
     drop_path_keep_prob = 1.0 - step_ratio * (1.0 - drop_path_keep_prob)

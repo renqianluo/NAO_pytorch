@@ -11,6 +11,7 @@ import argparse
 import torch.nn as nn
 import torch.utils
 import torch.nn.functional as F
+from torch.autograd import Variable
 import torchvision.datasets as dset
 import torch.backends.cudnn as cudnn
 from model import NASNetwork
@@ -37,7 +38,7 @@ parser.add_argument('--lr_min', type=float, default=None)
 parser.add_argument('--keep_prob', type=float, default=0.5)
 parser.add_argument('--drop_path_keep_prob', type=float, default=1.0)
 parser.add_argument('--l2_reg', type=float, default=1e-4)
-parser.add_argument('--fixed_arc', type=str, default=None)
+parser.add_argument('--arch', type=str, default=None)
 parser.add_argument('--use_aux_head', action='store_true', default=False)
 parser.add_argument('--seed', type=int, default=None)
 args = parser.parse_args()
@@ -46,7 +47,7 @@ log_format = '%(asctime)s %(message)s'
 logging.basicConfig(stream=sys.stdout, level=logging.INFO,
     format=log_format, datefmt='%m/%d %I:%M:%S %p')
 
-def train(train_queue, model, optimizer):
+def train(train_queue, model, optimizer, global_step):
     objs = utils.AvgrageMeter()
     top1 = utils.AvgrageMeter()
     top5 = utils.AvgrageMeter()
@@ -56,7 +57,8 @@ def train(train_queue, model, optimizer):
         target = Variable(target).cuda(async=True)
     
         optimizer.zero_grad()
-        logits, aux_logits = model(input)
+        logits, aux_logits = model(input, global_step)
+        global_step += 1
         loss = model.loss(logits, target)
         if not aux_logits:
             aux_loss = model.loss(aux_logits, target)
@@ -109,7 +111,7 @@ def main():
     
     np.random.seed(args.seed)
     cudnn.benchmark = True
-    torch.manmual_seed(args.seed)
+    torch.manual_seed(args.seed)
     cudnn.enabled = True
     torch.cuda.manual_seed(args.seed)
     
@@ -127,30 +129,31 @@ def main():
         weight_decay=args.l2_reg,
     )
     train_transform, valid_transform = utils._data_transforms_cifar10(args)
-    train_data = dset.CIFAR10(root=args.data, train=True, download=True, transform=train_transform)
-    valid_data = dset.CIFAR10(root=args.data, train=False, download=True, transform=valid_transform)
+    train_data = dset.CIFAR10(root=args.data_path, train=True, download=True, transform=train_transform)
+    valid_data = dset.CIFAR10(root=args.data_path, train=False, download=True, transform=valid_transform)
     train_queue = torch.utils.data.DataLoader(
         train_data, batch_size=args.batch_size, shuffle=True, pin_memory=True, num_workers=16)
     valid_queue = torch.utils.data.DataLoader(
         valid_data, batch_size=args.batch_size, shuffle=False, pin_memory=True, num_workers=16)
     scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, float(args.num_epochs))
     
-    _, model_state_dict, epoch, scheduler_state_dict, optimizer_state_dict = utils.load(args.output_dir)
+    _, model_state_dict, epoch, step, scheduler_state_dict, optimizer_state_dict = utils.load(args.output_dir)
     if model_state_dict is not None:
         model.load_state_dict(model_state_dict)
     if scheduler_state_dict is not None:
         scheduler.load_state_dict(scheduler_state_dict)
     if optimizer_state_dict is not None:
         optimizer.load_state_dict(optimizer_state_dict)
-    
-    for epoch in range(args.epochs):
+     
+    while epoch < args.num_epochs:
         scheduler.step()
         logging.info('epoch %d lr %e', epoch, scheduler.get_lr()[0])
-        train_acc, train_obj = train(train_queue, model, optimizer)
+        train_acc, train_obj, step = train(train_queue, model, optimizer, step)
         logging.info('train_acc %f', train_acc)
         valid_acc, valid_obj = valid(valid_queue, model)
         logging.info('valid_acc %f', valid_acc)
-        utils.save(args.output_dir, args, model, epoch, scheduler, optimizer)
+        epoch += 1
+        utils.save(args.output_dir, args, model, epoch, step, scheduler, optimizer)
         
 
 if __name__ == '__main__':
