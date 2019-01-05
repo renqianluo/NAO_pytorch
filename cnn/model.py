@@ -12,7 +12,7 @@ import utils
     
 
 class Node(nn.Module):
-    def __init__(self, x_id, x_op, y_id, y_op, x, y, out_filters, stride=1, drop_path_keep_prob=None,
+    def __init__(self, x_id, x_op, y_id, y_op, x_shape, y_shape, out_filters, stride=1, drop_path_keep_prob=None,
                  layer_id=0, num_layers=0, num_steps=0):
         super(Node, self).__init__()
         self.out_filters = out_filters
@@ -30,27 +30,32 @@ class Node(nn.Module):
         if x_op in [0, 1]:
             pass
         elif x_op in [2, 3]:
-            if x[-1] != out_filters:
+            if x_shape[-1] != out_filters:
                 self.x_op.add_module('pool_conv', ReLUConvBN(x[-1], out_filters, 1, 1, 0))
         else:
             if x_stride  > 1:
                 assert x_stride == 2
                 self.x_op.add_module('id_fact_reduce', FactorizedReduce(x[-1], out_filters))
-            if x[-1] != out_filters:
+            if x_shape[-1] != out_filters:
                 self.x_op.add_module('id_conv', ReLUConvBN(x[-1], out_filters, 1, 1, 0))
+        x_shape[0], x_shape[1], x_shape[2] = x_shape[0] // stride, x_shape[1] // stride, out_filters
 
         y_stride = stride if y_id in [0, 1] else 1
         if y_op in [0, 1]:
             pass
         elif y_op in [2, 3]:
-            if y[-1] != out_filters:
+            if y_shape[-1] != out_filters:
                 self.y_op.add_module('pool_conv', ReLUConvBN(y[-1], out_filters, 1, 1, 0))
         else:
             if y_stride > 1:
                 assert y_stride == 2
                 self.y_op.add_module('id_fact_reduce', FactorizedReduce(y[-1], out_filters))
-            if y[-1] != out_filters:
+            if y_shape[-1] != out_filters:
                 self.y_op.add_module('id_conv', ReLUConvBN(y[-1], out_filters, 1, 1, 0))
+        y_shape[0], y_shape[1], y_shape[2] = y_shape[0] // stride, y_shape[1] // stride, out_filters
+        
+        assert x_shape[0] == y_shape[0] and x_shape[1] == y_shape[1]
+        self.out_shape = [x_shape[0], x_shape[1], x_shape[2]]
         
     def forward(self, x, y, step):
         x = self.x_op(x)
@@ -104,7 +109,7 @@ class Cell(nn.Module):
             self.ops.append(node)
             self.used[x_id] += 1
             self.used[y_id] += 1
-            shapes.append([x_shape[0]//stride, x_shape[1]//stride, out_filters])
+            shapes.append(node.out_shape)
         out_hw = min([shape[0] for i, shape in enumerate(shapes) if self.used[i] == 0])
         layers[0], layers[1] = [layers[-1], [out_hw, out_hw, out_filters]]
         self.concat = []
@@ -156,7 +161,7 @@ class NASNetwork(nn.Module):
             nn.Conv2d(3, out_filters, 3, padding=1, bias=False),
             nn.BatchNorm2d(out_filters)
         )
-        layers = [[32,32,out_filters],[32,32,out_filters]]
+        layers = [[32, 32, out_filters],[32, 32, out_filters]]
         out_filters = self.out_filters
         self.cells = nn.ModuleList()
         for i in range(self.num_layers+2):
