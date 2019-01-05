@@ -156,7 +156,7 @@ class NASNetwork(nn.Module):
         if self.use_aux_head:
             self.aux_head_index = self.pool_layers[-1] #+ 1
         stem_multiplier = 3
-        out_filters = stem_multiplier * self.C
+        out_filters = stem_multiplier * self.out_filters
         self.stem = nn.Sequential(
             nn.Conv2d(3, out_filters, 3, padding=1, bias=False),
             nn.BatchNorm2d(out_filters)
