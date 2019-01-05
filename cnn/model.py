@@ -23,39 +23,52 @@ class Node(nn.Module):
         self.num_steps = num_steps
         self.x_id = x_id
         self.y_id = y_id
+        x_shape = list(x_shape)
+        y_shape = list(y_shape)
         
         x_stride = stride if x_id in [0, 1] else 1
-        self.x_op = nn.Sequential(OPERATIONS[x_op](out_filters, x_stride, True))
         if x_op in [0, 1]:
-            pass
+            self.x_op = nn.Sequential(OPERATIONS[x_op](out_filters, x_stride, True))
+            x_shape = [x_shape[0] // x_stride, x_shape[1] // x_stride, out_filters]
         elif x_op in [2, 3]:
+            self.x_op = nn.Sequential(OPERATIONS[x_op](out_filters, x_stride, True))
+            x_shape = [x_shape[0] // x_stride, x_shape[1] // x_stride, x_shape[-1]]
             if x_shape[-1] != out_filters:
                 self.x_op.add_module('pool_conv', ReLUConvBN(x[-1], out_filters, 1, 1, 0))
+                x_shape = [x_shape[0], x_shape[1], out_filters]
         else:
+            self.x_op = nn.Sequential(OPERATIONS[x_op](out_filters, x_stride, True))
             if x_stride  > 1:
                 assert x_stride == 2
                 self.x_op.add_module('id_fact_reduce', FactorizedReduce(x_shape[-1], out_filters))
+                x_shape = [x_shape[0] // x_stride, x_shape[1] // x_stride, out_filters]
             if x_shape[-1] != out_filters:
                 self.x_op.add_module('id_conv', ReLUConvBN(x[-1], out_filters, 1, 1, 0))
-        out_x_shape = [x_shape[0] // x_stride, x_shape[1] // x_stride, out_filters]
+                x_shape = [x_shape[0], x_shape[1], out_filters]
+        
 
         y_stride = stride if y_id in [0, 1] else 1
-        self.y_op = nn.Sequential(OPERATIONS[y_op](out_filters, y_stride, True))
         if y_op in [0, 1]:
-            pass
+            self.y_op = nn.Sequential(OPERATIONS[y_op](out_filters, y_stride, True))
+            y_shape = [y_shape[0] // y_stride, y_shape[1] // y_stride, out_filters]
         elif y_op in [2, 3]:
+            self.y_op = nn.Sequential(OPERATIONS[y_op](out_filters, y_stride, True))
+            y_shape = [y_shape[0] // y_stride, y_shape[1] // y_stride, y_shape[-1]]
             if y_shape[-1] != out_filters:
                 self.y_op.add_module('pool_conv', ReLUConvBN(y[-1], out_filters, 1, 1, 0))
+                y_shape = [y_shape[0], y_shape[1], out_filters]
         else:
+            self.y_op = nn.Sequential(OPERATIONS[y_op](out_filters, y_stride, True))
             if y_stride > 1:
                 assert y_stride == 2
                 self.y_op.add_module('id_fact_reduce', FactorizedReduce(y_shape[-1], out_filters))
+                y_shape = [y_shape[0] // y_stride, y_shape[1] // y_stride, out_filters]
             if y_shape[-1] != out_filters:
                 self.y_op.add_module('id_conv', ReLUConvBN(y[-1], out_filters, 1, 1, 0))
-        out_y_shape = [y_shape[0] // y_stride, y_shape[1] // y_stride, out_filters]
+                y_shape = [y_shape[0], y_shape[1], out_filters]
         
-        assert out_x_shape[0] == out_y_shape[0] and out_x_shape[1] == out_y_shape[1]
-        self.out_shape = [out_x_shape[0], out_x_shape[1], out_x_shape[2]]
+        assert x_shape[0] == y_shape[0] and x_shape[1] == y_shape[1]
+        self.out_shape = list(x_shape)
         
     def forward(self, x, y, step):
         x = self.x_op(x)
