@@ -9,7 +9,7 @@ OPERATIONS = {
     1: lambda C, stride, affine: SepConv(C, C, 5, stride, 2, affine=affine), # sep conv 5 x 5
     2: lambda C, stride, affine: nn.AvgPool2d(3, stride=stride, padding=1, count_include_pad=False), # avg pool 3 x 3
     3: lambda C, stride, affine: nn.MaxPool2d(3, stride=stride, padding=1), # max pool 3x 3
-    4: lambda C, stride, affine: Identity() if stride == 1 else FactorizedReduce(C, C, affine=affine), # identity
+    4: lambda C, stride, affine: Identity(), # identity
 }
 
 
