@@ -175,7 +175,7 @@ class NASNetwork(nn.Module):
             outs = [outs[-1], cell.out_shape]
             
             if self.use_aux_head and i == self.aux_head_index:
-                self.aux_head = AuxHead(layers[-1][-1])
+                self.aux_head = AuxHead(outs[-1][-1])
         
         self.relu = nn.ReLU(inplace=False)
         self.global_pooling = nn.AdaptiveAvgPool2d(1)
