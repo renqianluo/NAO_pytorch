@@ -29,8 +29,6 @@ parser.add_argument('--num_epochs', type=int, default=600)
 parser.add_argument('--num_layers', type=int, default=5)
 parser.add_argument('--num_nodes', type=int, default=5)
 parser.add_argument('--out_filters', type=int, default=36)
-parser.add_argument('--lr_T_0', type=int, default=None)
-parser.add_argument('--lr_T_mul', type=int, default=None)
 parser.add_argument('--cutout_size', type=int, default=None)
 parser.add_argument('--grad_bound', type=float, default=5.0)
 parser.add_argument('--lr_max', type=float, default=None)
@@ -142,7 +140,7 @@ def main():
     if optimizer_state_dict is not None:
         optimizer.load_state_dict(optimizer_state_dict)
 
-    scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, float(args.num_epochs), args.lr_min, epoch)
+    scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, float(args.num_epochs), args.lr_min, epoch-1)
     while epoch < args.num_epochs:
         scheduler.step()
         logging.info('epoch %d lr %e', epoch, scheduler.get_lr()[0])

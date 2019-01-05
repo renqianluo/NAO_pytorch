@@ -110,7 +110,7 @@ def save(model_path, args, model, epoch, step, optimizer):
 def load(model_path):
     newest_filename = os.path.join(model_path, 'checkpoint.pt')
     if not os.path.exists(newest_filename):
-        return None, None, 0, 0, None, None
+        return None, None, 0, 0, None
     state_dict = torch.load(newest_filename)
     args = state_dict['args']
     model_state_dict = state_dict['model']
