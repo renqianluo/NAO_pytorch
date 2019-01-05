@@ -13,6 +13,7 @@ OPERATIONS = {
 }
 
 
+
 def drop_path(x, keep_prob):
     if keep_prob < 1.:
         noise_shape = [x.size(0), 1, 1, 1]
@@ -106,3 +107,33 @@ class FactorizedReduce(nn.Module):
         out = torch.cat([self.path1(path1), self.path1(path2)], dim=1)
         out = self.bn(out)
         return out
+
+
+class MaybeCalibrateSize(nn.Module):
+    def __init__(self, layers, out_filters, affine=True):
+        super(MaybeCalibrateSize, self).__init__()
+        self.preprocess_x, self.preprocess_y = None, None
+        hw = [layer[0] for layer in layers]
+        c = [layer[-1] for layer in layers]
+        
+        x_out_shape = [hw[0], hw[1], c[0]]
+        y_out_shape = [hw[1], hw[1], c[1]]
+        if hw[0] != hw[1]:
+            assert hw[0] == 2 * hw[1]
+            self.preprocess_x = nn.Sequential(nn.ReLU(), FactorizedReduce(c[0], out_filters))
+            x_out_shape = [hw[1], hw[1], out_filters]
+        elif c[0] != out_filters:
+            self.preprocess_x = ReLUConvBN(c[0], out_filters, 1, 1, 0)
+            x_out_shape = [hw[0], hw[0], out_filters]
+        if c[1] != out_filters:
+            self.preprocess_y = ReLUConvBN(layers[1][-1], out_filters, 1, 1, 0)
+            y_out_shape = [hw[1], hw[1], out_filters]
+            
+        self.out_shape = [x_out_shape, y_out_shape]
+    
+    def forward(self, s0, s1):
+        if self.preprocess_x is not None:
+            s0 = self.preprocess_x(s0)
+        if self.preprocess_y is not None:
+            s1 = self.preprocess_y(s1)
+        return [s0, s1]

@@ -23,10 +23,9 @@ class Node(nn.Module):
         self.num_steps = num_steps
         self.x_id = x_id
         self.y_id = y_id
-        self.x_op = nn.Sequential(OPERATIONS[x_op](out_filters, stride, True))
-        self.y_op = nn.Sequential(OPERATIONS[y_op](out_filters, stride, True))
         
         x_stride = stride if x_id in [0, 1] else 1
+        self.x_op = nn.Sequential(OPERATIONS[x_op](out_filters, x_stride, True))
         if x_op in [0, 1]:
             pass
         elif x_op in [2, 3]:
@@ -41,6 +40,7 @@ class Node(nn.Module):
         out_x_shape = [x_shape[0] // x_stride, x_shape[1] // x_stride, out_filters]
 
         y_stride = stride if y_id in [0, 1] else 1
+        self.y_op = nn.Sequential(OPERATIONS[y_op](out_filters, y_stride, True))
         if y_op in [0, 1]:
             pass
         elif y_op in [2, 3]:
@@ -86,37 +86,27 @@ class Cell(nn.Module):
         
         # maybe calibrate size
         layers = [list(prev_layers[0]), list(prev_layers[1])]
-        self.preprocess_x, self.preprocess_y = None, None
-        if layers[0][0] != layers[1][0]:
-            assert layers[0][0] == 2 * layers[1][0]
-            self.preprocess_x = nn.Sequential(nn.ReLU(), FactorizedReduce(layers[0][-1], out_filters))
-            layers[0] = [layers[1][0], layers[1][1], out_filters]
-        elif layers[0][-1] != out_filters:
-            self.preprocess_x = ReLUConvBN(layers[0][-1], out_filters, 1, 1, 0)
-            layers[0] = [layers[0][0], layers[0][1], out_filters]
-        if layers[1][-1] != out_filters:
-            self.preprocess_y = ReLUConvBN(layers[1][-1], out_filters, 1, 1, 0)
-            layers[1][-1] = out_filters
-            
+        self.maybe_calibrate_size = MaybeCalibrateSize(layers, out_filters)
+        layers = self.maybe_calibrate_size.out_shape
+
         self.layer_base = ReLUConvBN(layers[1][-1], out_filters, 1, 1, 0)
         layers[1][-1] = out_filters
         
         stride = 2 if self.reduction else 1
-        shapes = [layers[0], layers[1]]
         for i in range(self.num_nodes):
             x_id, x_op, y_id, y_op = arch[4*i], arch[4*i+1], arch[4*i+2], arch[4*i+3]
-            x_shape, y_shape = shapes[x_id], shapes[y_id]
+            x_shape, y_shape = layers[x_id], layers[y_id]
             node = Node(x_id, x_op, y_id, y_op, x_shape, y_shape, out_filters, stride, drop_path_keep_prob, layer_id, num_layers, num_steps)
             self.ops.append(node)
             self.used[x_id] += 1
             self.used[y_id] += 1
-            shapes.append(node.out_shape)
+            layers.append(node.out_shape)
         
         self.concat = []
         for i, c in enumerate(self.used):
             if self.used[i] == 0:
                 self.concat.append(i)
-        out_hw = min([shape[0] for i, shape in enumerate(shapes) if self.used[i] == 0])
+        out_hw = min([shape[0] for i, shape in enumerate(layers) if self.used[i] == 0])
         prev_layers[0], prev_layers[1] = [prev_layers[-1], [out_hw, out_hw, out_filters*len(self.concat)]]
     
     def forward(self, s0, s1, step):
@@ -172,6 +162,7 @@ class NASNetwork(nn.Module):
                 out_filters *= 2
                 cell = Cell(self.reduc_arch, layers, out_filters, True, i, self.num_layers+2, self.num_steps, self.drop_path_keep_prob)
             self.cells.append(cell)
+            layers = [layers[-1], cell.out_shape]
             
             if self.use_aux_head and i == self.aux_head_index:
                 self.aux_head = AuxHead(layers[-1][-1])
