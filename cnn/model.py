@@ -111,13 +111,13 @@ class Cell(nn.Module):
             self.used[x_id] += 1
             self.used[y_id] += 1
             shapes.append(node.out_shape)
-        out_hw = min([shape[0] for i, shape in enumerate(shapes) if self.used[i] == 0])
-        prev_layers[0], prev_layers[1] = [prev_layers[-1], [out_hw, out_hw, out_filters]]
+        
         self.concat = []
         for i, c in enumerate(self.used):
             if self.used[i] == 0:
                 self.concat.append(i)
-
+        out_hw = min([shape[0] for i, shape in enumerate(shapes) if self.used[i] == 0])
+        prev_layers[0], prev_layers[1] = [prev_layers[-1], [out_hw, out_hw, out_filters*len(self.concat)]]
     
     def forward(self, s0, s1, step):
         if self.preprocess_x is not None:
