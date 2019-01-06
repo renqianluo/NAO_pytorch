@@ -117,21 +117,6 @@ def main():
     
     logging.info("Args = %s", args)
     
-    model = NASNetwork(args.layers, args.nodes, args.channels, args.keep_prob, args.drop_path_keep_prob, args.use_aux_head, args.steps, args.arch)
-    criterion = nn.CrossEntropyLoss().cuda()
-    
-    if torch.cuda.device_count() > 1:
-        logging.info("Use %d %s", torch.cuda.device_count(), "GPUs !")
-        model = nn.DataParallel(model)
-    model = model.cuda()
-    
-    logging.info("param size = %fMB", utils.count_parameters_in_MB(model))
-    optimizer = torch.optim.SGD(
-        model.parameters(),
-        args.lr_max,
-        momentum=0.9,
-        weight_decay=args.l2_reg,
-    )
     train_transform, valid_transform = utils._data_transforms_cifar10(args.cutout_size)
     train_data = dset.CIFAR10(root=args.data_path, train=True, download=True, transform=train_transform)
     valid_data = dset.CIFAR10(root=args.data_path, train=False, download=True, transform=valid_transform)
@@ -139,6 +124,22 @@ def main():
         train_data, batch_size=args.batch_size, shuffle=True, pin_memory=True, num_workers=16)
     valid_queue = torch.utils.data.DataLoader(
         valid_data, batch_size=args.eval_batch_size, shuffle=False, pin_memory=True, num_workers=16)
+
+    model = NASNetwork(args.layers, args.nodes, args.channels, args.keep_prob, args.drop_path_keep_prob,
+                       args.use_aux_head, args.steps, args.arch)
+    logging.info("param size = %fMB", utils.count_parameters_in_MB(model))
+    criterion = nn.CrossEntropyLoss().cuda()
+    optimizer = torch.optim.SGD(
+        model.parameters(),
+        args.lr_max,
+        momentum=0.9,
+        weight_decay=args.l2_reg,
+    )
+    
+    if torch.cuda.device_count() > 1:
+        logging.info("Use %d %s", torch.cuda.device_count(), "GPUs !")
+        model = nn.DataParallel(model)
+    model = model.cuda()
     
     _, model_state_dict, epoch, step, optimizer_state_dict = utils.load(args.output_dir)
     if model_state_dict is not None:
