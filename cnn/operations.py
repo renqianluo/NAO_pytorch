@@ -106,7 +106,7 @@ class WSSepConv(nn.Module):
         
         self.relu1 = nn.ReLU(inplace=False)
         self.W1_depthwise = nn.ParameterList([torch.Tensor(1, C_in, kernel_size, kernel_size) for i in range(num_possible_inputs)])
-        self.W1_pointwise = nn.ParameterList([torch.Tensor(C_out, C_in, 1, 1)] for i in range(num_possible_inputs))
+        self.W1_pointwise = nn.ParameterList([torch.Tensor(C_out, C_in, 1, 1) for i in range(num_possible_inputs)])
         self.bn1 = nn.BatchNorm2d(C_in, affine=affine)
 
         self.relu2 = nn.ReLU(inplace=False)
