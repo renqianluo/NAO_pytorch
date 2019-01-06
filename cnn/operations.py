@@ -66,7 +66,7 @@ class WSReLUConvBN(nn.Module):
         self.kernel_size = kernel_size
         self.stride = stride
         self.padding = padding
-        self.w = nn.ParameterList([torch.Tensor(C_out, C_in, kernel_size, kernel_size) for i in range(num_possible_inputs)])
+        self.w = nn.ParameterList([nn.Parameter(torch.Tensor(C_out, C_in, kernel_size, kernel_size)) for i in range(num_possible_inputs)])
         self.relu = nn.ReLU(inplace=False)
         self.bn = nn.BatchNorm2d(C_out, affine=affine)
     
@@ -105,14 +105,14 @@ class WSSepConv(nn.Module):
         self.padding = padding
         
         self.relu1 = nn.ReLU(inplace=False)
-        self.W1_depthwise = nn.ParameterList([torch.Tensor(1, C_in, kernel_size, kernel_size) for i in range(num_possible_inputs)])
-        self.W1_pointwise = nn.ParameterList([torch.Tensor(C_out, C_in, 1, 1) for i in range(num_possible_inputs)])
+        self.W1_depthwise = nn.ParameterList([nn.Parameter(torch.Tensor(1, C_in, kernel_size, kernel_size)) for i in range(num_possible_inputs)])
+        self.W1_pointwise = nn.ParameterList([nn.Parameter(torch.Tensor(C_out, C_in, 1, 1)) for i in range(num_possible_inputs)])
         self.bn1 = nn.BatchNorm2d(C_in, affine=affine)
 
         self.relu2 = nn.ReLU(inplace=False)
         self.W2_depthwise = nn.ParameterList(
-            [torch.Tensor(1, C_in, kernel_size, kernel_size)] for i in range(num_possible_inputs))
-        self.W2_pointwise = nn.ParameterList([torch.Tensor(C_out, C_in, 1, 1)] for i in range(num_possible_inputs))
+            [nn.Parameter(torch.Tensor(1, C_in, kernel_size, kernel_size)) for i in range(num_possible_inputs)])
+        self.W2_pointwise = nn.ParameterList([nn.Parameter(torch.Tensor(C_out, C_in, 1, 1)) for i in range(num_possible_inputs)])
         self.bn2 = nn.BatchNorm2d(C_in, affine=affine)
     
     def forward(self, x, x_id):
