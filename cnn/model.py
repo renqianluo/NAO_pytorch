@@ -118,6 +118,7 @@ class Cell(nn.Module):
             if self.used[i] == 0:
                 self.concat.append(i)
         out_hw = min([shape[0] for i, shape in enumerate(prev_layers) if self.used[i] == 0])
+        self.final_combine = FinalCombine(prev_layers, out_hw, channels, self.concat)
         self.out_shape = [out_hw, out_hw, channels * len(self.concat)]
     
     def forward(self, s0, s1, step):
@@ -131,7 +132,7 @@ class Cell(nn.Module):
             y = states[y_id]
             out = self.ops[i](x, y, step)
             states.append(out)
-        return torch.cat([states[i] for i in self.concat], dim=1)
+        return self.final_combine(states)
         
 
 class NASNetwork(nn.Module):
@@ -147,10 +148,10 @@ class NASNetwork(nn.Module):
         arch = list(map(int, arch.strip().split()))
         self.conv_arch = arch[:4 * self.nodes]
         self.reduc_arch = arch[4 * self.nodes:]
-        
+
+        self.pool_layers = [self.layers, 2 * self.layers + 1]
         self.layers = self.layers * 3
-        pool_distance = self.layers // 3
-        self.pool_layers = [pool_distance, 2 * pool_distance + 1]
+        
         if self.use_aux_head:
             self.aux_head_index = self.pool_layers[-1] #+ 1
         stem_multiplier = 3

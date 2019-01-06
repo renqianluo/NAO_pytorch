@@ -154,10 +154,10 @@ class NASNetwork(nn.Module):
         self.drop_path_keep_prob = drop_path_keep_prob
         self.use_aux_head = use_aux_head
         self.steps = steps
-    
+
+        self.pool_layers = [self.layers, 2 * self.layers + 1]
         self.layers = self.layers * 3
-        pool_distance = self.layers // 3
-        self.pool_layers = [pool_distance, 2 * pool_distance + 1]
+       
         if self.use_aux_head:
             self.aux_head_index = self.pool_layers[-1] #+ 1
         stem_multiplier = 3

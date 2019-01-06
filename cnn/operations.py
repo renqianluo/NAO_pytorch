@@ -186,3 +186,26 @@ class MaybeCalibrateSize(nn.Module):
         if s1.size(1) != self.channels:
             s1 = self.preprocess_y(s1)
         return [s0, s1]
+
+
+class FinalCombine(nn.Module):
+    def __init__(self, layers, out_hw, channels, concat, affine=True):
+        super(FinalCombine, self).__init__()
+        self.out_hw = out_hw
+        self.channels = channels
+        self.concat = concat
+        self.ops = {}
+        for i, layer in enumerate(layers):
+            if i in concat:
+                hw = layer[0]
+                if hw > out_hw:
+                    assert hw == out_hw
+                    self.ops[i] = FactorizedReduce(layer[-1], channels)
+        
+    def forward(self, states):
+        for i, state in enumerate(states):
+            if i in self.concat:
+                if state.size(2) > self.out_hw:
+                    states[i] = self.ops[i](state)
+        out = torch.cat([states[i] for i in self.concat], dim=1)
+        return out

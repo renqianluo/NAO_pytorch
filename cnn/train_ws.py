@@ -134,7 +134,7 @@ def main():
             args.arch_pool = archs
     
     args.eval_every_epochs = eval(args.eval_every_epochs)
-    train_transform, valid_transform = utils._data_transforms_cifar10(args)
+    train_transform, valid_transform = utils._data_transforms_cifar10(args.cutout_size)
     train_data = dset.CIFAR10(root=args.data_path, train=True, download=True, transform=train_transform)
     valid_data = dset.CIFAR10(root=args.data_path, train=False, download=True, transform=valid_transform)
     train_queue = torch.utils.data.DataLoader(train_data, batch_size=args.batch_size, pin_memory=True, num_workers=16)
@@ -155,8 +155,7 @@ def main():
         weight_decay=args.l2_reg,
     )
   
-    scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(
-        optimizer, float(args.epochs), eta_min=args.lr_min)
+    scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, float(args.epochs), eta_min=args.lr_min)
     
     step = 0
     for epoch in range(1, args.epochs+1):
