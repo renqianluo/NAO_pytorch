@@ -79,7 +79,7 @@ def train(train_queue, model, optimizer, global_step, arch_pool):
         
         if step % 100 == 0:
             logging.info('train %03d loss %e top1 %f top5 %f', step, objs.avg, top1.avg, top5.avg)
-            logging.info('arch: ', arch)
+            logging.info('arch: ', ' '.join(map(str, arch[0]+arch[1])))
     
     return top1.avg, objs.avg, global_step
 
