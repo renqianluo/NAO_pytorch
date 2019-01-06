@@ -159,9 +159,9 @@ class FactorizedReduce(nn.Module):
 
 
 class MaybeCalibrateSize(nn.Module):
-    def __init__(self, layers, out_filters, affine=True):
+    def __init__(self, layers, channels, affine=True):
         super(MaybeCalibrateSize, self).__init__()
-        self.preprocess_x, self.preprocess_y = None, None
+        self.channels = channels
         hw = [layer[0] for layer in layers]
         c = [layer[-1] for layer in layers]
         
@@ -169,20 +169,20 @@ class MaybeCalibrateSize(nn.Module):
         y_out_shape = [hw[1], hw[1], c[1]]
         if hw[0] != hw[1]:
             assert hw[0] == 2 * hw[1]
-            self.preprocess_x = nn.Sequential(nn.ReLU(), FactorizedReduce(c[0], out_filters))
-            x_out_shape = [hw[1], hw[1], out_filters]
-        elif c[0] != out_filters:
-            self.preprocess_x = ReLUConvBN(c[0], out_filters, 1, 1, 0)
-            x_out_shape = [hw[0], hw[0], out_filters]
-        if c[1] != out_filters:
-            self.preprocess_y = ReLUConvBN(layers[1][-1], out_filters, 1, 1, 0)
-            y_out_shape = [hw[1], hw[1], out_filters]
+            self.preprocess_x = nn.Sequential(nn.ReLU(), FactorizedReduce(c[0], channels))
+            x_out_shape = [hw[1], hw[1], channels]
+        elif c[0] != channels:
+            self.preprocess_x = ReLUConvBN(c[0], channels, 1, 1, 0)
+            x_out_shape = [hw[0], hw[0], channels]
+        if c[1] != channels:
+            self.preprocess_y = ReLUConvBN(layers[1][-1], channels, 1, 1, 0)
+            y_out_shape = [hw[1], hw[1], channels]
             
         self.out_shape = [x_out_shape, y_out_shape]
     
     def forward(self, s0, s1):
-        if self.preprocess_x is not None:
+        if s0.size(2) != s1.size(2) or s0.size(1) != self.channels:
             s0 = self.preprocess_x(s0)
-        if self.preprocess_y is not None:
+        if s1.size(1) != self.channels:
             s1 = self.preprocess_y(s1)
         return [s0, s1]
