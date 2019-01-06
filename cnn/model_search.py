@@ -29,34 +29,31 @@ class Node(nn.Module):
         
         # avg_pool
         self.x_avg_pool = nn.AvgPool2d(3, stride=1, padding=1, count_include_pad=False)
-        self.x_avg_pool_conv = None
-        if x_shape[-1] != channels:
-            self.x_avg_pool_conv = WSReLUConvBN(num_possible_inputs, x_shape[-1], channels, 1, 1, 0, False)
+        assert x_shape[-1] == channels
+        #if x_shape[-1] != channels:
+        #    self.x_avg_pool_conv = WSReLUConvBN(num_possible_inputs, x_shape[-1], channels, 1, 1, 0, False)
         # max_pool
         self.x_max_pool = nn.MaxPool2d(3, stride=1, padding=1)
-        self.x_max_pool_conv = None
-        if x_shape[-1] != channels:
-            self.x_max_pool_conv = WSReLUConvBN(num_possible_inputs, x_shape[-1], channels, 1, 1, 0, False)
+        #if x_shape[-1] != channels:
+        #    self.x_max_pool_conv = WSReLUConvBN(num_possible_inputs, x_shape[-1], channels, 1, 1, 0, False)
         # x_conv, before sep conv and id
-        if x_shape[-1] != channels:
-            self.x_conv = WSReLUConvBN(num_possible_inputs, x_shape[-1], channels, 1, 1, 0, False)
+        #if x_shape[-1] != channels:
+        #    self.x_conv = WSReLUConvBN(num_possible_inputs, x_shape[-1], channels, 1, 1, 0, False)
         # sep_conv
         self.x_sep_conv_3 = WSSepConv(num_possible_inputs, channels, channels, 3, 1, 1)
         self.x_sep_conv_5 = WSSepConv(num_possible_inputs, channels, channels, 5, 1, 2)
 
         # avg_pool
         self.y_avg_pool = nn.AvgPool2d(3, stride=1, padding=1, count_include_pad=False)
-        self.y_avg_pool_conv = None
-        if y_shape[-1] != channels:
-            self.y_avg_pool_conv = WSReLUConvBN(num_possible_inputs, y_shape[-1], channels, 1, 1, 0, False)
+        #if y_shape[-1] != channels:
+        #    self.y_avg_pool_conv = WSReLUConvBN(num_possible_inputs, y_shape[-1], channels, 1, 1, 0, False)
         # max_pool
         self.y_max_pool = nn.MaxPool2d(3, stride=1, padding=1)
-        self.y_max_pool_conv = None
-        if y_shape[-1] != channels:
-            self.y_max_pool_conv = WSReLUConvBN(num_possible_inputs, y_shape[-1], channels, 1, 1, 0, False)
+        #if y_shape[-1] != channels:
+        #    self.y_max_pool_conv = WSReLUConvBN(num_possible_inputs, y_shape[-1], channels, 1, 1, 0, False)
         # y_conv, x_conv, before sep conv and id
-        if y_shape[-1] != channels:
-            self.y_conv = WSReLUConvBN(num_possible_inputs, y_shape[-1], channels, 1, 1, 0, False)
+        #if y_shape[-1] != channels:
+        #    self.y_conv = WSReLUConvBN(num_possible_inputs, y_shape[-1], channels, 1, 1, 0, False)
         # sep_conv
         self.y_sep_conv_3 = WSSepConv(num_possible_inputs, channels, channels, 3, 1, 1)
         self.y_sep_conv_5 = WSSepConv(num_possible_inputs, channels, channels, 5, 1, 2)
@@ -65,45 +62,45 @@ class Node(nn.Module):
         
     def forward(self, x, x_id, x_op, y, y_id, y_op):
         if x_op == 0:
-            if x.size(-1) != self.channels:
+            if x.size(1) != self.channels:
                 x = self.x_conv(x, x_id)
             x = self.x_sep_conv_3(x, x_id)
         elif x_op == 1:
-            if x.size(-1) != self.channels:
+            if x.size(1) != self.channels:
                 x = self.x_conv(x, x_id)
             x = self.x_sep_conv_5(x, x_id)
         elif x_op == 2:
             x = self.x_avg_pool(x)
-            if x.size(-1) != self.channels:
+            if x.size(1) != self.channels:
                 x = self.x_avg_pool_conv(x, x_id)
         elif x_op == 3:
             x = self.x_max_pool(x)
-            if x.size(-1) != self.channels:
+            if x.size(1) != self.channels:
                 x = self.x_max_pool_conv(x, x_id)
         else:
             assert x_op == 4
-            if x.size(-1) != self.channels:
+            if x.size(1) != self.channels:
                 x = self.x_conv(x, x_id)
         
         if y_op == 0:
-            if y.size(-1) != self.channels:
+            if y.size(1) != self.channels:
                 y = self.y_conv(y, y_id)
             y = self.y_sep_conv_3(y, y_id)
         elif y_op == 1:
-            if y.size(-1) != self.channels:
+            if y.size(1) != self.channels:
                 y = self.y_conv(y, y_id)
             y = self.y_sep_conv_5(y, y_id)
         elif y_op == 2:
             y = self.y_avg_pool(y)
-            if y.size(-1) != self.channels:
+            if y.size(1) != self.channels:
                 y = self.y_avg_pool_conv(y, y_id)
         elif y_op == 3:
             y = self.y_max_pool(y)
-            if y.size(-1) != self.channels:
+            if y.size(1) != self.channels:
                 y = self.y_max_pool_conv(y, y_id)
         else:
             assert y_op == 4
-            if y.size(-1) != self.channels:
+            if y.size(1) != self.channels:
                 y = self.x_conv(y, y_id)
         return x + y
 
@@ -112,6 +109,7 @@ class Cell(nn.Module):
     def __init__(self, prev_layers, nodes, channels, reduction, layer_id, layers, steps, drop_path_keep_prob=None):
         super(Cell, self).__init__()
         assert len(prev_layers) == 2
+        print(prev_layers)
         self.reduction = reduction
         self.layer_id = layer_id
         self.layers = layers
