@@ -145,7 +145,7 @@ def main():
   
     model = NASNetwork(args.layers, args.nodes, args.channels, args.keep_prob, args.drop_path_keep_prob, args.use_aux_head, args.steps, )
     model = model.cuda()
-    criterion = nn.CrossEntropyLoss()
+    criterion = nn.CrossEntropyLoss().cuda()
     logging.info("param size = %fMB", utils.count_parameters_in_MB(model))
     
     optimizer = torch.optim.SGD(
