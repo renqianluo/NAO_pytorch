@@ -145,7 +145,7 @@ class Cell(nn.Module):
             x_id, x_op, y_id, y_op = arch[4*i], arch[4*i+1], arch[4*i+2], arch[4*i+3]
             used[x_id] += 1
             used[y_id] += 1
-            out = self.ops[i](states[x_id], x_op, states[y_id], y_op)
+            out = self.ops[i](states[x_id], x_id, x_op, states[y_id], y_id, y_op)
             states.append(out)
         concat = []
         for i, c in enumerate(self.used):
