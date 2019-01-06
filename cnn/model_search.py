@@ -44,7 +44,7 @@ class Node(nn.Module):
             
         self.out_shape = [prev_layers[0][0], prev_layers[0][1], channels]
         
-    def forward(self, x, x_id, x_op, y, y_id, y_op):
+    def forward(self, x, x_id, x_op, y, y_id, y_op, step):
         if x_op == 0:
             if x.size(1) != self.channels:
                 x = self.x_conv(x, x_id)
@@ -86,6 +86,12 @@ class Node(nn.Module):
             assert y_op == 4
             if y.size(1) != self.channels:
                 y = self.x_conv(y, y_id)
+         
+        if x_op != 4:
+            x = apply_drop_path(x, self.drop_path_keep_prob, self.layer_id, self.layers, step, self.steps)
+        if y_op != 4:
+            y = apply_drop_path(y, self.drop_path_keep_prob, self.layer_id, self.layers, step, self.steps)
+            
         return x + y
 
 
@@ -119,7 +125,7 @@ class Cell(nn.Module):
         self.out_shape = [out_hw, out_hw, channels]
         
     
-    def forward(self, s0, s1, arch):
+    def forward(self, s0, s1, arch, step):
         s0, s1 = self.maybe_calibrate_size(s0, s1)
         states = [s0, s1]
         used = [0] * (self.nodes + 2)
@@ -127,7 +133,7 @@ class Cell(nn.Module):
             x_id, x_op, y_id, y_op = arch[4*i], arch[4*i+1], arch[4*i+2], arch[4*i+3]
             used[x_id] += 1
             used[y_id] += 1
-            out = self.ops[i](states[x_id], x_id, x_op, states[y_id], y_id, y_op)
+            out = self.ops[i](states[x_id], x_id, x_op, states[y_id], y_id, y_op, step)
             states.append(out)
         concat = []
         for i, c in enumerate(used):
@@ -203,9 +209,9 @@ class NASNetwork(nn.Module):
                 assert i in self.pool_layers
                 fac_rec = self.fac_recs[self.pool_layers.index(i)]
                 s0, s1 = s1, fac_rec(s1)
-                s0, s1 = s1, cell(s0, s1, reduc_arch)
+                s0, s1 = s1, cell(s0, s1, reduc_arch, step)
             else:
-                s0, s1 = s1, cell(s0, s1, conv_arch)
+                s0, s1 = s1, cell(s0, s1, conv_arch, step)
             if self.use_aux_head and i == self.aux_head_index and self.training:
                 aux_logits = self.aux_head(s1)
         out = self.relu(s1)
