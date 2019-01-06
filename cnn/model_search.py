@@ -124,7 +124,6 @@ class Cell(nn.Module):
         
         self.out_shape = [out_hw, out_hw, channels]
         
-    
     def forward(self, s0, s1, arch, step):
         s0, s1 = self.maybe_calibrate_size(s0, s1)
         states = [s0, s1]
