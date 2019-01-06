@@ -170,7 +170,7 @@ def main():
         valid_accuracy_list = valid(valid_queue, model, args.arch_pool)
 
         # Output archs and evaluated error rate
-        with open(os.path.join(args.model_dir, 'arch_pool.{}.perf'.format(epoch)), 'w') as f:
+        with open(os.path.join(args.output_dir, 'arch_pool.{}.perf'.format(epoch)), 'w') as f:
             for arch, perf in zip(args.arch_pool, valid_accuracy_list):
                 arch = ' '.join(map(str, arch[0] + arch[1]))
                 f.write('arch: {}\tvalid acc: {}\n'.format(arch, perf))
