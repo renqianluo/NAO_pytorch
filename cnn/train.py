@@ -45,7 +45,7 @@ log_format = '%(asctime)s %(message)s'
 logging.basicConfig(stream=sys.stdout, level=logging.INFO,
     format=log_format, datefmt='%m/%d %I:%M:%S %p')
 
-def train(train_queue, model, optimizer, global_step):
+def train(train_queue, model, optimizer, global_step, criterion):
     objs = utils.AvgrageMeter()
     top1 = utils.AvgrageMeter()
     top5 = utils.AvgrageMeter()
@@ -57,9 +57,9 @@ def train(train_queue, model, optimizer, global_step):
         optimizer.zero_grad()
         logits, aux_logits = model(input, global_step)
         global_step += 1
-        loss = model.loss(logits, target)
+        loss = criterion(logits, target)
         if aux_logits is not None:
-            aux_loss = model.loss(aux_logits, target)
+            aux_loss = criterion(aux_logits, target)
             loss += 0.4 * aux_loss
         loss.backward()
         nn.utils.clip_grad_norm(model.parameters(), args.grad_bound)
@@ -77,7 +77,7 @@ def train(train_queue, model, optimizer, global_step):
     return top1.avg, objs.avg, global_step
 
 
-def valid(valid_queue, model):
+def valid(valid_queue, model, criterion):
     objs = utils.AvgrageMeter()
     top1 = utils.AvgrageMeter()
     top5 = utils.AvgrageMeter()
@@ -88,7 +88,7 @@ def valid(valid_queue, model):
         target = Variable(target, volatile=True).cuda(async=True)
     
         logits, _ = model(input)
-        loss = model.loss(logits, target)
+        loss = criterion(logits, target)
     
         prec1, prec5 = utils.accuracy(logits, target, topk=(1, 5))
         n = input.size(0)
@@ -118,11 +118,12 @@ def main():
     logging.info("Args = %s", args)
     
     model = NASNetwork(args.layers, args.nodes, args.channels, args.keep_prob, args.drop_path_keep_prob, args.use_aux_head, args.steps, args.arch)
-    model = model.cuda()
+    criterion = nn.CrossEntropyLoss()
     
     if torch.cuda.device_count() > 1:
         logging.info("Use %d %s", torch.cuda.device_count(), "GPUs !")
         model = nn.DataParallel(model)
+    model = model.cuda()
     
     logging.info("param size = %fMB", utils.count_parameters_in_MB(model))
     optimizer = torch.optim.SGD(
@@ -149,9 +150,9 @@ def main():
     while epoch < args.epochs:
         scheduler.step()
         logging.info('epoch %d lr %e', epoch, scheduler.get_lr()[0])
-        train_acc, train_obj, step = train(train_queue, model, optimizer, step)
+        train_acc, train_obj, step = train(train_queue, model, optimizer, step, criterion)
         logging.info('train_acc %f', train_acc)
-        valid_acc, valid_obj = valid(valid_queue, model)
+        valid_acc, valid_obj = valid(valid_queue, model, criterion)
         logging.info('valid_acc %f', valid_acc)
         epoch += 1
         utils.save(args.output_dir, args, model, epoch, step, optimizer)

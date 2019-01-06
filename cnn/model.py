@@ -147,7 +147,6 @@ class NASNetwork(nn.Module):
         arch = list(map(int, arch.strip().split()))
         self.conv_arch = arch[:4 * self.nodes]
         self.reduc_arch = arch[4 * self.nodes:]
-        self.criterion = nn.CrossEntropyLoss()
         
         self.layers = self.layers * 3
         pool_distance = self.layers // 3

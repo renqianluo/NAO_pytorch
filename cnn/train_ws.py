@@ -49,7 +49,7 @@ logging.basicConfig(stream=sys.stdout, level=logging.INFO,
     format=log_format, datefmt='%m/%d %I:%M:%S %p')
 
 
-def train(train_queue, model, optimizer, global_step, arch_pool):
+def train(train_queue, model, optimizer, global_step, arch_pool, criterion):
     objs = utils.AvgrageMeter()
     top1 = utils.AvgrageMeter()
     top5 = utils.AvgrageMeter()
@@ -63,9 +63,9 @@ def train(train_queue, model, optimizer, global_step, arch_pool):
         arch = utils.sample_arch(arch_pool)
         logits, aux_logits = model(input, arch, global_step)
         global_step += 1
-        loss = model.loss(logits, target)
+        loss = criterion(logits, target)
         if aux_logits is not None:
-            aux_loss = model.loss(aux_logits, target)
+            aux_loss = criterion(aux_logits, target)
             loss += 0.4 * aux_loss
         loss.backward()
         nn.utils.clip_grad_norm(model.parameters(), args.grad_bound)
@@ -84,7 +84,7 @@ def train(train_queue, model, optimizer, global_step, arch_pool):
     return top1.avg, objs.avg, global_step
 
 
-def valid(valid_queue, model, arch_pool):
+def valid(valid_queue, model, arch_pool, criterion):
     valid_acc_list = []
     for arch in arch_pool:
         objs = utils.AvgrageMeter()
@@ -96,7 +96,7 @@ def valid(valid_queue, model, arch_pool):
             target = Variable(target, volatile=True).cuda(async=True)
         
             logits, _ = model(input, arch)
-            loss = model.loss(logits, target)
+            loss = criterion(logits, target)
         
             prec1, prec5 = utils.accuracy(logits, target, topk=(1, 5))
             n = input.size(0)
@@ -145,6 +145,7 @@ def main():
   
     model = NASNetwork(args.layers, args.nodes, args.channels, args.keep_prob, args.drop_path_keep_prob, args.use_aux_head, args.steps, )
     model = model.cuda()
+    criterion = nn.CrossEntropyLoss()
     logging.info("param size = %fMB", utils.count_parameters_in_MB(model))
     
     optimizer = torch.optim.SGD(
@@ -163,11 +164,11 @@ def main():
         lr = scheduler.get_lr()[0]
         logging.info('epoch %d lr %e', epoch, lr)
         # sample an arch to train
-        train_acc, train_obj, step = train(train_queue, model, optimizer, step, args.arch_pool)
+        train_acc, train_obj, step = train(train_queue, model, optimizer, step, args.arch_pool, criterion)
         logging.info('train_acc %f', train_acc)
     
         # Evaluate seed archs
-        valid_accuracy_list = valid(valid_queue, model, args.arch_pool)
+        valid_accuracy_list = valid(valid_queue, model, args.arch_pool, criterion)
 
         # Output archs and evaluated error rate
         with open(os.path.join(args.output_dir, 'arch_pool.{}.perf'.format(epoch)), 'w') as f:

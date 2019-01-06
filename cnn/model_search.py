@@ -155,7 +155,6 @@ class NASNetwork(nn.Module):
         self.drop_path_keep_prob = drop_path_keep_prob
         self.use_aux_head = use_aux_head
         self.steps = steps
-        self.criterion = nn.CrossEntropyLoss()
     
         self.layers = self.layers * 3
         pool_distance = self.layers // 3
