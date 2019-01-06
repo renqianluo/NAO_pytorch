@@ -130,7 +130,7 @@ class Cell(nn.Module):
             out = self.ops[i](states[x_id], x_id, x_op, states[y_id], y_id, y_op)
             states.append(out)
         concat = []
-        for i, c in enumerate(self.used):
+        for i, c in enumerate(used):
             if used[i] == 0:
                 concat.append(i)
                 
