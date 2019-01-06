@@ -72,7 +72,7 @@ def train(train_queue, model, optimizer, global_step, criterion):
         top5.update(prec5.data[0], n)
     
         if step % 100 == 0:
-            logging.info('train %03d %e %f %f', step, objs.avg, top1.avg, top5.avg)
+            logging.info('train %03d loss %e top1 %f top5 %f', step, objs.avg, top1.avg, top5.avg)
 
     return top1.avg, objs.avg, global_step
 
