@@ -101,6 +101,7 @@ class Cell(nn.Module):
         prev_layers = [list(prev_layers[0]), list(prev_layers[1])]
         self.maybe_calibrate_size = MaybeCalibrateSize(prev_layers, channels)
         prev_layers = self.maybe_calibrate_size.out_shape
+        self.layer_base = ReLUConvBN(prev_layers[1][-1], channels, 1, 1, 0)
         
         stride = 2 if self.reduction else 1
         for i in range(self.nodes):
