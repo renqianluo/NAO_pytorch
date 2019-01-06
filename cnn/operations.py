@@ -169,13 +169,13 @@ class MaybeCalibrateSize(nn.Module):
         y_out_shape = [hw[1], hw[1], c[1]]
         if hw[0] != hw[1]:
             assert hw[0] == 2 * hw[1]
-            self.preprocess_x = nn.Sequential(nn.ReLU(), FactorizedReduce(c[0], channels))
+            self.preprocess_x = nn.Sequential(nn.ReLU(), FactorizedReduce(c[0], channels, affine))
             x_out_shape = [hw[1], hw[1], channels]
         elif c[0] != channels:
-            self.preprocess_x = ReLUConvBN(c[0], channels, 1, 1, 0)
+            self.preprocess_x = ReLUConvBN(c[0], channels, 1, 1, 0, affine)
             x_out_shape = [hw[0], hw[0], channels]
         if c[1] != channels:
-            self.preprocess_y = ReLUConvBN(layers[1][-1], channels, 1, 1, 0)
+            self.preprocess_y = ReLUConvBN(layers[1][-1], channels, 1, 1, 0, affine)
             y_out_shape = [hw[1], hw[1], channels]
             
         self.out_shape = [x_out_shape, y_out_shape]
@@ -194,18 +194,20 @@ class FinalCombine(nn.Module):
         self.out_hw = out_hw
         self.channels = channels
         self.concat = concat
-        self.ops = {}
+        self.ops = nn.ModuleList()
+        self.concat_fac_op_dict = {}
         for i, layer in enumerate(layers):
             if i in concat:
                 hw = layer[0]
                 if hw > out_hw:
                     assert hw == 2 * out_hw
-                    self.ops[i] = FactorizedReduce(layer[-1], channels)
+                    self.concat_fac_op_dict[i] = len(self.ops)
+                    self.ops.append(FactorizedReduce(layer[-1], channels, affine))
         
     def forward(self, states):
         for i, state in enumerate(states):
             if i in self.concat:
-                if state.size(2) > self.out_hw:
-                    states[i] = self.ops[i](state)
+                if i in self.concat_fac_op_dict:
+                    states[i] = self.ops[self.concat_fac_op_dict[i]](state)
         out = torch.cat([states[i] for i in self.concat], dim=1)
         return out
