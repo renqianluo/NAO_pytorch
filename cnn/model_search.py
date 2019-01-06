@@ -12,53 +12,37 @@ import utils
 
 
 class Node(nn.Module):
-    def __init__(self, prev_layers, channels, stride=1, drop_path_keep_prob=None, layer_id=0, layers=0, steps=0):
+    def __init__(self, prev_layers, channels, stride=1, drop_path_keep_prob=None, node_id, layer_id=0, layers=0, steps=0):
         super(Node, self).__init__()
         self.channels = channels
         self.stride = stride
         self.drop_path_keep_prob = drop_path_keep_prob
+        self.node_id = node_id
         self.layer_id = layer_id
         self.layers = layers
         self.steps = steps
-        x_shape = list(prev_layers[0])
-        y_shape = list(prev_layers[1])
         self.x_op = nn.ModuleList()
         self.y_op = nn.ModuleList()
         
-        num_possible_inputs = layer_id + 2
+        num_possible_inputs = node_id + 2
         
         # avg_pool
         self.x_avg_pool = nn.AvgPool2d(3, stride=1, padding=1, count_include_pad=False)
-        assert x_shape[-1] == channels
-        #if x_shape[-1] != channels:
-        #    self.x_avg_pool_conv = WSReLUConvBN(num_possible_inputs, x_shape[-1], channels, 1, 1, 0, False)
         # max_pool
         self.x_max_pool = nn.MaxPool2d(3, stride=1, padding=1)
-        #if x_shape[-1] != channels:
-        #    self.x_max_pool_conv = WSReLUConvBN(num_possible_inputs, x_shape[-1], channels, 1, 1, 0, False)
-        # x_conv, before sep conv and id
-        #if x_shape[-1] != channels:
-        #    self.x_conv = WSReLUConvBN(num_possible_inputs, x_shape[-1], channels, 1, 1, 0, False)
         # sep_conv
         self.x_sep_conv_3 = WSSepConv(num_possible_inputs, channels, channels, 3, 1, 1)
         self.x_sep_conv_5 = WSSepConv(num_possible_inputs, channels, channels, 5, 1, 2)
 
         # avg_pool
         self.y_avg_pool = nn.AvgPool2d(3, stride=1, padding=1, count_include_pad=False)
-        #if y_shape[-1] != channels:
-        #    self.y_avg_pool_conv = WSReLUConvBN(num_possible_inputs, y_shape[-1], channels, 1, 1, 0, False)
         # max_pool
         self.y_max_pool = nn.MaxPool2d(3, stride=1, padding=1)
-        #if y_shape[-1] != channels:
-        #    self.y_max_pool_conv = WSReLUConvBN(num_possible_inputs, y_shape[-1], channels, 1, 1, 0, False)
-        # y_conv, x_conv, before sep conv and id
-        #if y_shape[-1] != channels:
-        #    self.y_conv = WSReLUConvBN(num_possible_inputs, y_shape[-1], channels, 1, 1, 0, False)
         # sep_conv
         self.y_sep_conv_3 = WSSepConv(num_possible_inputs, channels, channels, 3, 1, 1)
         self.y_sep_conv_5 = WSSepConv(num_possible_inputs, channels, channels, 5, 1, 2)
             
-        self.out_shape = [x_shape[0], x_shape[1], channels]
+        self.out_shape = [prev_layers[0][0], prev_layers[0][1], channels]
         
     def forward(self, x, x_id, x_op, y, y_id, y_op):
         if x_op == 0:
@@ -125,7 +109,7 @@ class Cell(nn.Module):
 
         stride = 2 if self.reduction else 1
         for i in range(self.nodes):
-            node = Node(prev_layers, channels, stride, drop_path_keep_prob, layer_id, layers, steps)
+            node = Node(prev_layers, channels, stride, drop_path_keep_prob, i, layer_id, layers, steps)
             self.ops.append(node)
             prev_layers.append(node.out_shape)
         out_hw = min([shape[0] for i, shape in enumerate(prev_layers)])

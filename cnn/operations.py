@@ -100,6 +100,8 @@ class SepConv(nn.Module):
 class WSSepConv(nn.Module):
     def __init__(self, num_possible_inputs, C_in, C_out, kernel_size, stride, padding, affine=True):
         super(WSSepConv, self).__init__()
+        self.num_possible_inputs = num_possible_inputs
+        self.C_out = C_out
         self.C_in = C_in
         self.stride = stride
         self.padding = padding
