@@ -12,7 +12,7 @@ import utils
 
 
 class Node(nn.Module):
-    def __init__(self, prev_layers, channels, stride=1, drop_path_keep_prob=None, node_id, layer_id=0, layers=0, steps=0):
+    def __init__(self, prev_layers, channels, stride=1, drop_path_keep_prob=None, node_id=0, layer_id=0, layers=0, steps=0):
         super(Node, self).__init__()
         self.channels = channels
         self.stride = stride
