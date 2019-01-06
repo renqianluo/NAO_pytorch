@@ -87,9 +87,9 @@ class Node(nn.Module):
             if y.size(1) != self.channels:
                 y = self.x_conv(y, y_id)
          
-        if x_op != 4:
+        if x_op != 4 and self.drop_path_keep_prob is not None and self.training:
             x = apply_drop_path(x, self.drop_path_keep_prob, self.layer_id, self.layers, step, self.steps)
-        if y_op != 4:
+        if y_op != 4 and self.drop_path_keep_prob is not None and self.training:
             y = apply_drop_path(y, self.drop_path_keep_prob, self.layer_id, self.layers, step, self.steps)
             
         return x + y
