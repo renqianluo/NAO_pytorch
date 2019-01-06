@@ -72,8 +72,11 @@ class WSReLUConvBN(nn.Module):
     
     def forward(self, x, x_id):
         x = self.relu(x)
-        w = self.w[x_id]
-        w = w.view(self.C_out, len(x_id)*self.C_in, self.kernel_size, self.kernel_size)
+        if isinstance(x_id, int):
+            w = self.w[x_id]
+        else:
+            assert isinstance(x_id, list)
+            w = torch.cat([self.w[i] for i in x_id], axis=1)
         x = F.conv2d(x, w, stride=self.stride, padding=self.padding)
         x = self.bn(x)
         return x
