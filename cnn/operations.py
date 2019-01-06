@@ -199,7 +199,7 @@ class FinalCombine(nn.Module):
             if i in concat:
                 hw = layer[0]
                 if hw > out_hw:
-                    assert hw == out_hw
+                    assert hw == 2 * out_hw
                     self.ops[i] = FactorizedReduce(layer[-1], channels)
         
     def forward(self, states):
