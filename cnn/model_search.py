@@ -209,7 +209,7 @@ class NASNetwork(nn.Module):
     def init_parameters(self):
         for w in self.parameters():
             if w.data.dim() >= 2:
-                nn.init.kaiming_normal(w.data, nonlinearity='relu')
+                nn.init.kaiming_normal(w.data)
     
     def forward(self, input, arch, step=None):
         aux_logits = None
