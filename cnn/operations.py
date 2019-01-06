@@ -58,6 +58,27 @@ class ReLUConvBN(nn.Module):
         return self.op(x)
 
 
+class WSReLUConvBN(nn.Module):
+    def __init__(self, num_possible_inputs, C_in, C_out, kernel_size, stride, padding, affine=True):
+        super(WSReLUConvBN, self).__init__()
+        self.C_in = C_in
+        self.C_out = C_out
+        self.kernel_size = kernel_size
+        self.stride = stride
+        self.padding = padding
+        self.w = nn.ParameterList([torch.Tensor(C_out, C_in, kernel_size, kernel_size)] for i in range(num_possible_inputs))
+        self.relu = nn.ReLU(inplace=False)
+        self.bn = nn.BatchNorm2d(C_out, affine=affine)
+    
+    def forward(self, x, x_id):
+        x = self.relu(x)
+        w = self.w[x_id]
+        w = w.view(self.C_out, len(x_id)*self.C_in, self.kernel_size, self.kernel_size)
+        x = F.conv2d(x, w, stride=self.stride, padding=self.padding)
+        x = self.bn(x)
+        return x
+
+
 class SepConv(nn.Module):
     def __init__(self, C_in, C_out, kernel_size, stride, padding, affine=True):
         super(SepConv, self).__init__()
@@ -74,6 +95,37 @@ class SepConv(nn.Module):
     
     def forward(self, x):
         return self.op(x)
+
+
+class WSSepConv(nn.Module):
+    def __init__(self, num_possible_inputs, C_in, C_out, kernel_size, stride, padding, affine=True):
+        super(WSSepConv, self).__init__()
+        self.C_in = C_in
+        self.stride = stride
+        self.padding = padding
+        
+        self.relu1 = nn.ReLU(inplace=False)
+        self.W1_depthwise = nn.ParameterList([torch.Tensor(1, C_in, kernel_size, kernel_size)] for i in range(num_possible_inputs))
+        self.W1_pointwise = nn.ParameterList([torch.Tensor(C_out, C_in, 1, 1)] for i in range(num_possible_inputs))
+        self.bn1 = nn.BatchNorm2d(C_in, affine=affine)
+
+        self.relu2 = nn.ReLU(inplace=False)
+        self.W2_depthwise = nn.ParameterList(
+            [torch.Tensor(1, C_in, kernel_size, kernel_size)] for i in range(num_possible_inputs))
+        self.W2_pointwise = nn.ParameterList([torch.Tensor(C_out, C_in, 1, 1)] for i in range(num_possible_inputs))
+        self.bn2 = nn.BatchNorm2d(C_in, affine=affine)
+    
+    def forward(self, x, x_id):
+        x = self.relu1(x)
+        x = F.conv2d(x, self.W1_depthwise[x_id], stride=self.stride, padding=self.padding, groups=self.C_in)
+        x = F.conv2d(x, self.W1_pointwise[x_id], padding=0)
+        x = self.bn1(x)
+
+        x = self.relu2(x)
+        x = F.conv2d(x, self.W2_depthwise[x_id], padding=self.padding, groups=self.C_in)
+        x = F.conv2d(x, self.W2_pointwise[x_id], padding=0)
+        x = self.bn2(x)
+        return x
 
 
 class Identity(nn.Module):

@@ -119,6 +119,7 @@ def main():
     
     model = NASNetwork(args.layers, args.nodes, args.channels, args.keep_prob, args.drop_path_keep_prob, args.use_aux_head, args.steps, args.arch)
     model = model.cuda()
+    
     if torch.cuda.device_count() > 1:
         logging.info("Use ", torch.cuda.device_count(), "GPUs !")
         model = nn.DataParallel(model)
@@ -136,7 +137,7 @@ def main():
     train_queue = torch.utils.data.DataLoader(
         train_data, batch_size=args.batch_size, shuffle=True, pin_memory=True, num_workers=16)
     valid_queue = torch.utils.data.DataLoader(
-        valid_data, batch_size=args.batch_size, shuffle=False, pin_memory=True, num_workers=16)
+        valid_data, batch_size=args.eval_batch_size, shuffle=False, pin_memory=True, num_workers=16)
     
     _, model_state_dict, epoch, step, optimizer_state_dict = utils.load(args.output_dir)
     if model_state_dict is not None:

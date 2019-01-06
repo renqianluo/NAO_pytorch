@@ -12,122 +12,216 @@ import utils
 
 
 class Node(nn.Module):
-    def __init__(self, C):
+    def __init__(self, prev_layers, channels, stride=1, drop_path_keep_prob=None, layer_id=0, layers=0, steps=0):
         super(Node, self).__init__()
-        self.branch1 = nn.ModuleList()
-        self.branch2 = nn.ModuleList()
-        num_op = len(OPERATIONS)
-        for op_id in range(num_op):
-            op1 = OPERATIONS[op_id](C, 1, False)
-            op2 = OPERATIONS[op_id](C, 1, False)
-            #if op_id in [2,3]:
-            #  op1 = nn.Sequential(op1, nn.BatchNorm2d(C, affine=False))
-            #  op2 = nn.Sequential(op2, nn.BatchNorm2d(C, affine=False))
-            self.branch1.append(op1)
-            self.branch2.append(op2)
+        self.channels = channels
+        self.stride = stride
+        self.drop_path_keep_prob = drop_path_keep_prob
+        self.layer_id = layer_id
+        self.layers = layers
+        self.steps = steps
+        x_shape = list(prev_layers[0])
+        y_shape = list(prev_layers[1])
+        self.x_op = nn.ModuleList()
+        self.y_op = nn.ModuleList()
+        
+        num_possible_inputs = layer_id + 2
+        
+        # avg_pool
+        self.x_avg_pool = nn.AvgPool2d(3, stride=1, padding=1, count_include_pad=False)
+        self.x_avg_pool_conv = None
+        if x_shape[-1] != channels:
+            self.x_avg_pool_conv = WSReLUConvBN(num_possible_inputs, x_shape[-1], channels, 1, 1, 0, False)
+        # max_pool
+        self.x_max_pool = nn.MaxPool2d(3, stride=1, padding=1)
+        self.x_max_pool_conv = None
+        if x_shape[-1] != channels:
+            self.x_max_pool_conv = WSReLUConvBN(num_possible_inputs, x_shape[-1], channels, 1, 1, 0, False)
+        # x_conv, before sep conv and id
+        if x_shape[-1] != channels:
+            self.x_conv = WSReLUConvBN(num_possible_inputs, x_shape[-1], channels, 1, 1, 0, False)
+        # sep_conv
+        self.x_sep_conv_3 = WSSepConv(num_possible_inputs, channels, channels, 3, 1, 1)
+        self.x_sep_conv_5 = WSSepConv(num_possible_inputs, channels, channels, 5, 1, 2)
 
-    def forward(self, x, x_op, y, y_op):
-        return self.branch1[x_op](x) + self.branch2[y_op](y)
+        # avg_pool
+        self.y_avg_pool = nn.AvgPool2d(3, stride=1, padding=1, count_include_pad=False)
+        self.y_avg_pool_conv = None
+        if y_shape[-1] != channels:
+            self.y_avg_pool_conv = WSReLUConvBN(num_possible_inputs, y_shape[-1], channels, 1, 1, 0, False)
+        # max_pool
+        self.y_max_pool = nn.MaxPool2d(3, stride=1, padding=1)
+        self.y_max_pool_conv = None
+        if y_shape[-1] != channels:
+            self.y_max_pool_conv = WSReLUConvBN(num_possible_inputs, y_shape[-1], channels, 1, 1, 0, False)
+        # y_conv, x_conv, before sep conv and id
+        if y_shape[-1] != channels:
+            self.y_conv = WSReLUConvBN(num_possible_inputs, y_shape[-1], channels, 1, 1, 0, False)
+        # sep_conv
+        self.y_sep_conv_3 = WSSepConv(num_possible_inputs, channels, channels, 3, 1, 1)
+        self.y_sep_conv_5 = WSSepConv(num_possible_inputs, channels, channels, 5, 1, 2)
+            
+        self.out_shape = [x_shape[0], x_shape[1], channels]
+        
+    def forward(self, x, x_id, x_op, y, y_id, y_op):
+        if x_op == 0:
+            if x.size(-1) != self.channels:
+                x = self.x_conv(x, x_id)
+            x = self.x_sep_conv_3(x, x_id)
+        elif x_op == 1:
+            if x.size(-1) != self.channels:
+                x = self.x_conv(x, x_id)
+            x = self.x_sep_conv_5(x, x_id)
+        elif x_op == 2:
+            x = self.x_avg_pool(x)
+            if x.size(-1) != self.channels:
+                x = self.x_avg_pool_conv(x, x_id)
+        elif x_op == 3:
+            x = self.x_max_pool(x)
+            if x.size(-1) != self.channels:
+                x = self.x_max_pool_conv(x, x_id)
+        else:
+            assert x_op == 4
+            if x.size(-1) != self.channels:
+                x = self.x_conv(x, x_id)
+        
+        if y_op == 0:
+            if y.size(-1) != self.channels:
+                y = self.y_conv(y, y_id)
+            y = self.y_sep_conv_3(y, y_id)
+        elif y_op == 1:
+            if y.size(-1) != self.channels:
+                y = self.y_conv(y, y_id)
+            y = self.y_sep_conv_5(y, y_id)
+        elif y_op == 2:
+            y = self.y_avg_pool(y)
+            if y.size(-1) != self.channels:
+                y = self.y_avg_pool_conv(y, y_id)
+        elif y_op == 3:
+            y = self.y_max_pool(y)
+            if y.size(-1) != self.channels:
+                y = self.y_max_pool_conv(y, y_id)
+        else:
+            assert y_op == 4
+            if y.size(-1) != self.channels:
+                y = self.x_conv(y, y_id)
+        return x + y
 
 
 class Cell(nn.Module):
-    def __init__(self, num_nodes, C_prev_prev, C_prev, C, reduction, reduction_prev):
+    def __init__(self, prev_layers, channels, reduction, layer_id, layers, steps, drop_path_keep_prob=None):
         super(Cell, self).__init__()
-        self.num_cells = num_nodes
+        assert len(prev_layers) == 2
         self.reduction = reduction
-        #self.maybe_calibrate_size = MaybeCalibrateSize(C_prev_prev, C_prev, C)
-        # bellow is same to maybecalibratesize in tf
-        if reduction:
-            self.preprocess_x = FactorizedReduce(C_prev_prev, C, affine=False)
-        #else:
-        #    self.preprocess_x = ReLUConvBN(C_prev_prev, C, 1, 1, 0, affine=False)
-        #self.preprocess_y = ReLUConvBN(C_prev, C, 1, 1, 0, affine=False)
-
+        self.layer_id = layer_id
+        self.layers = layers
+        self.steps = steps
+        self.drop_path_keep_prob = drop_path_keep_prob
         self.ops = nn.ModuleList()
-        for i in range(self.num_nodes):
-            op = Node(C)
-            self.ops.append(op)
+        self.nodes = 5
+        
+        # maybe calibrate size
+        prev_layers = [list(prev_layers[0]), list(prev_layers[1])]
+        self.maybe_calibrate_size = MaybeCalibrateSize(prev_layers, channels)
+        prev_layers = self.maybe_calibrate_size.out_shape
+
+        stride = 2 if self.reduction else 1
+        for i in range(self.nodes):
+            node = Node(prev_layers, channels, stride, drop_path_keep_prob, layer_id, layers, steps)
+            self.ops.append(node)
+            prev_layers.append(node.out_shape)
+        out_hw = min([shape[0] for i, shape in enumerate(prev_layers)])
+        
+        self.final_combine_conv = WSReLUConvBN(self.nodes+2, channels, channels, 1, 1, 0, False)
+        
+        self.out_shape = [out_hw, out_hw, channels]
+        
     
     def forward(self, s0, s1, arch):
-        if self.reduction:
-            s0 = self.preprocess_x(s0)
-        #s1 = self.preprocess_y(s1)
-    
-        assert len(arch) == 4 * self.num_nodes
+        s0, s1 = self.maybe_calibrate_size(s0, s1)
         states = [s0, s1]
-        for i in range(self.num_nodes):
+        used = [0] * (self.nodes + 2)
+        for i in range(self.nodes):
             x_id, x_op, y_id, y_op = arch[4*i], arch[4*i+1], arch[4*i+2], arch[4*i+3]
+            used[x_id] += 1
+            used[y_id] += 1
             out = self.ops[i](states[x_id], x_op, states[y_id], y_op)
             states.append(out)
-        return torch.cat(states, dim=1)
+        concat = []
+        for i, c in enumerate(self.used):
+            if used[i] == 0:
+                concat.append(i)
+                
+        out = torch.cat([states[i] for i in concat], dim=1)
+        out = self.final_combine_conv(out, concat)
+        return out
     
 
 class NASNetwork(nn.Module):
-    def __init__(self, num_layers, num_nodes, out_filters, keep_prob, drop_path_keep_prob, use_aux_head, num_epochs, num_train_batches):
+    def __init__(self, layers, nodes, channels, keep_prob, drop_path_keep_prob, use_aux_head, steps):
         super(NASNetwork, self).__init__()
-        logging.info("-" * 80)
-        logging.info("Build model")
-        self.num_layers = num_layers
-        self.num_cells = num_nodes
-        self.out_filters = out_filters
+        self.layers = layers
+        self.nodes = nodes
+        self.channels = channels
         self.keep_prob = keep_prob
-        self.use_aux_head = use_aux_head
-        self.num_epochs = num_epochs
-        self.num_train_batches = num_train_batches
-        self.num_train_steps = self.num_epochs * self.num_train_batches
         self.drop_path_keep_prob = drop_path_keep_prob
-        self.criterion = nn.CrossEntropyLoss().cuda()
-        
-        if self.drop_path_keep_prob is not None:
-            assert num_epochs is not None, "Need num_epochs to drop_path"
+        self.use_aux_head = use_aux_head
+        self.steps = steps
+        self.criterion = nn.CrossEntropyLoss()
     
-        self.num_layers = self.num_layers * 3
-        pool_distance = self.num_layers // 3
+        self.layers = self.layers * 3
+        pool_distance = self.layers // 3
         self.pool_layers = [pool_distance, 2 * pool_distance + 1]
         if self.use_aux_head:
             self.aux_head_index = self.pool_layers[-1] #+ 1
         stem_multiplier = 3
-        C_curr = stem_multiplier * self.out_filters
+        channels = stem_multiplier * self.channels
         self.stem = nn.Sequential(
-            nn.Conv2d(3, C_curr, 3, padding=1, bias=False),
-            nn.BatchNorm2d(C_curr)
+            nn.Conv2d(3, channels, 3, padding=1, bias=False),
+            nn.BatchNorm2d(channels)
         )
-    
+        outs = [[32, 32, channels], [32, 32, channels]]
+        channels = self.channels
         self.cells = nn.ModuleList()
-        C_prev_prev, C_prev, C_curr = C_curr, C_curr, self.out_filters
-        reduction_prev = False
-        for i in range(self.num_layers+2):
+        for i in range(self.layers+2):
             if i not in self.pool_layers:
-                cell = Cell(self.num_nodes, C_prev_prev, C_prev, C_curr, False, reduction_prev)
-                reduction_prev = False
+                cell = Cell(outs, self.nodes, channels, False, i, self.layers+2, self.steps, self.drop_path_keep_prob)
+                outs = [outs[-1], cell.out_shape]
             else:
-                C_curr *= 2
-                cell1 = FactorizedReduce(C_prev, C_curr, affine=False)
-                C_prev_prev, C_prev = C_prev, C_curr
-                cell2 = Cell(self.num_nodes, C_prev_prev, C_prev, C_curr, True, reduction_prev)
-                reduction_prev = True
+                channels *= 2
+                cell1 = FactorizedReduce(outs[-1][-1], channels, affine=False)
+                outs = [outs[-1], [outs[-1][0]//2, outs[-1][1]//2, channels]]
+                cell2 = Cell(outs, self.nodes, channels, True, i, self.layers+2, self.steps, self.drop_path_keep_prob)
                 cell = nn.Sequential(cell1, cell2)
+                outs = [outs[-1], cell2.out_shape]
             self.cells.append(cell)
-            C_prev_prev, C_prev = C_prev, C_curr
             
-            if i == self.aux_head_index:
-                self.aux_head = AuxHead(C_curr)
+            if self.use_aux_head and i == self.aux_head_index:
+                self.aux_head = AuxHead(outs[-1][-1])
 
         self.relu = nn.ReLU(inplace=False)
         self.global_pooling = nn.AdaptiveAvgPool2d(1)
         self.dropout = nn.Dropout(1 - self.keep_prob)
-        self.classifier = nn.Linear(C_prev, 10)
+        self.classifier = nn.Linear(outs[-1][-1], 10)
+
+        self.init_parameters()
+        
+    def init_parameters(self):
+        for w in self.parameters():
+            if w.data.dim() >= 2:
+                nn.init.kaiming_normal(w.data, nonlinearity='relu')
     
-    def forward(self, x, arch):
+    def forward(self, input, arch, step=None):
         aux_logits = None
+        arch = list(map(int, arch.strip().split()))
         conv_arch, reduc_arch = arch
-        s0 = s1 = self.stem(x)
+        s0 = s1 = self.stem(input)
         for i, cell in enumerate(self.cells):
             if cell.reduction:
                 s0, s1 = s1, cell(s0, s1, reduc_arch)
             else:
                 s0, s1 = s1, cell(s0, s1, conv_arch)
-            if i == self.aux_head_index and self.use_aux_head and self.training:
+            if self.use_aux_head and i == self.aux_head_index and self.training:
                 aux_logits = self.aux_head(s1)
         out = self.relu(s1)
         out = self.global_pooling(out)

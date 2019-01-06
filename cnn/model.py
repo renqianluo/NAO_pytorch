@@ -101,9 +101,6 @@ class Cell(nn.Module):
         prev_layers = [list(prev_layers[0]), list(prev_layers[1])]
         self.maybe_calibrate_size = MaybeCalibrateSize(prev_layers, channels)
         prev_layers = self.maybe_calibrate_size.out_shape
-
-        self.layer_base = ReLUConvBN(prev_layers[1][-1], channels, 1, 1, 0)
-        prev_layers[1][-1] = channels
         
         stride = 2 if self.reduction else 1
         for i in range(self.nodes):
@@ -149,7 +146,7 @@ class NASNetwork(nn.Module):
         arch = list(map(int, arch.strip().split()))
         self.conv_arch = arch[:4 * self.nodes]
         self.reduc_arch = arch[4 * self.nodes:]
-        self.criterion = nn.CrossEntropyLoss().cuda()
+        self.criterion = nn.CrossEntropyLoss()
         
         self.layers = self.layers * 3
         pool_distance = self.layers // 3
@@ -187,7 +184,7 @@ class NASNetwork(nn.Module):
     def init_parameters(self):
         for w in self.parameters():
             if w.data.dim() == 4:
-                nn.init.kaiming_normal(w.data)
+                nn.init.kaiming_normal(w.data, nonlinearity='relu')
     
     def forward(self, input, step=None):
         aux_logits = None

@@ -135,13 +135,12 @@ def create_exp_dir(path, scripts_to_save=None):
 def sample_arch(arch_pool, prob=None):
     if prob is not None:
         logging.info('Arch pool prob is provided, sampling according to the prob')
-        index = np.random.multinomial(1, prob)
+        prob = np.array(prob, dtype=np.float32)
+        prob = prob / prob.sum()
+        arch = np.random.choice(arch_pool, p=prob)
     else:
-        index = np.random.uniform([], minval=0, maxval=N, dtype=tf.int32)
-    arch = arch_pool[index]
-    conv_arch = arch[0]
-    reduc_arch = arch[1]
-    return conv_arch, reduc_arch
+        arch = np.random.choice(arch_pool)
+    return arch
 
 
 def generate_arch(n, num_nodes, num_ops=7):
