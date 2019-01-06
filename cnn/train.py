@@ -121,7 +121,7 @@ def main():
     model = model.cuda()
     
     if torch.cuda.device_count() > 1:
-        logging.info("Use ", torch.cuda.device_count(), "GPUs !")
+        logging.info("Use %d %s", torch.cuda.device_count(), "GPUs !")
         model = nn.DataParallel(model)
     
     logging.info("param size = %fMB", utils.count_parameters_in_MB(model))
