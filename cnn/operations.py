@@ -76,7 +76,7 @@ class WSReLUConvBN(nn.Module):
             w = self.w[x_id]
         else:
             assert isinstance(x_id, list)
-            w = torch.cat([self.w[i] for i in x_id], axis=1)
+            w = torch.cat([self.w[i] for i in x_id], dim=1)
         x = F.conv2d(x, w, stride=self.stride, padding=self.padding)
         x = self.bn(x)
         return x
