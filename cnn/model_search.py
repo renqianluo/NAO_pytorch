@@ -165,17 +165,18 @@ class NASNetwork(nn.Module):
         outs = [[32, 32, channels], [32, 32, channels]]
         channels = self.channels
         self.cells = nn.ModuleList()
+        self.fac_recs = nn.ModuleList()
         for i in range(self.layers+2):
             if i not in self.pool_layers:
                 cell = Cell(outs, self.nodes, channels, False, i, self.layers+2, self.steps, self.drop_path_keep_prob)
                 outs = [outs[-1], cell.out_shape]
             else:
                 channels *= 2
-                cell1 = FactorizedReduce(outs[-1][-1], channels, affine=False)
+                fac_rec = FactorizedReduce(outs[-1][-1], channels, affine=False)
+                self.fac_recs.append(fac_rec)
                 outs = [outs[-1], [outs[-1][0]//2, outs[-1][1]//2, channels]]
-                cell2 = Cell(outs, self.nodes, channels, True, i, self.layers+2, self.steps, self.drop_path_keep_prob)
-                cell = nn.Sequential(cell1, cell2)
-                outs = [outs[-1], cell2.out_shape]
+                cell = Cell(outs, self.nodes, channels, True, i, self.layers+2, self.steps, self.drop_path_keep_prob)
+                outs = [outs[-1], cell.out_shape]
             self.cells.append(cell)
             
             if self.use_aux_head and i == self.aux_head_index:
@@ -199,6 +200,9 @@ class NASNetwork(nn.Module):
         s0 = s1 = self.stem(input)
         for i, cell in enumerate(self.cells):
             if cell.reduction:
+                assert i in self.pool_layers
+                fac_rec = self.fac_recs[self.pool_layers.index(i)]
+                s0, s1 = s1, fac_rec(s1)
                 s0, s1 = s1, cell(s0, s1, reduc_arch)
             else:
                 s0, s1 = s1, cell(s0, s1, conv_arch)
