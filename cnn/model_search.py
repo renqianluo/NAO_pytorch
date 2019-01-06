@@ -109,7 +109,7 @@ class Node(nn.Module):
 
 
 class Cell(nn.Module):
-    def __init__(self, prev_layers, channels, reduction, layer_id, layers, steps, drop_path_keep_prob=None):
+    def __init__(self, prev_layers, nodes, channels, reduction, layer_id, layers, steps, drop_path_keep_prob=None):
         super(Cell, self).__init__()
         assert len(prev_layers) == 2
         self.reduction = reduction
@@ -118,7 +118,7 @@ class Cell(nn.Module):
         self.steps = steps
         self.drop_path_keep_prob = drop_path_keep_prob
         self.ops = nn.ModuleList()
-        self.nodes = 5
+        self.nodes = nodes
         
         # maybe calibrate size
         prev_layers = [list(prev_layers[0]), list(prev_layers[1])]
