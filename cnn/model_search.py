@@ -213,7 +213,6 @@ class NASNetwork(nn.Module):
     
     def forward(self, input, arch, step=None):
         aux_logits = None
-        arch = list(map(int, arch.strip().split()))
         conv_arch, reduc_arch = arch
         s0 = s1 = self.stem(input)
         for i, cell in enumerate(self.cells):
