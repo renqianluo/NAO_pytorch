@@ -342,9 +342,27 @@ def main():
         decoder_target = copy.copy(encoder_input)
 
         nao = NAO(
-        
+            args.controller_encoder_layers,
+            args.controller_encoder_vocab_size,
+            args.controller_encoder_hidden_size,
+            args.controller_encoder_dropout,
+            args.controller_encoder_length,
+            args.controller_source_length,
+            args.controller_encoder_emb_size,
+            args.controller_mlp_layers,
+            args.controller_mlp_hidden_size,
+            args.controller_mlp_dropout,
+            args.controller_decoder_layers,
+            args.controller_decoder_vocab_size,
+            args.controller_decoder_hidden_size,
+            args.controller_decoder_dropout,
+            args.controller_decoder_length,
         )
-        model = model.cuda()
+        nao = nao.cuda()
+        nao_train_queue = torch.utils.data.DataLoader(
+            torch., batch_size=args.child_batch_size,
+            sampler=torch.utils.data.sampler.SubsetRandomSampler(indices[:split]),
+            pin_memory=True, num_workers=16)
         args.controller_batches_per_epoch = np.ceil(len(encoder_input) / args.controller_batch_size)
         # if clean controller model
         controller.train(args, encoder_input, encoder_target, decoder_target)

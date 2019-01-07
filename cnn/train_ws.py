@@ -154,11 +154,17 @@ def main():
         momentum=0.9,
         weight_decay=args.l2_reg,
     )
-  
-    scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, float(args.epochs), eta_min=args.lr_min)
+
+    _, model_state_dict, epoch, step, optimizer_state_dict = utils.load(args.output_dir)
+    if model_state_dict is not None:
+        model.load_state_dict(model_state_dict)
+    if optimizer_state_dict is not None:
+        optimizer.load_state_dict(optimizer_state_dict)
+    
+    scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, float(args.epochs), args.lr_min, epoch-1)
     
     step = 0
-    for epoch in range(1, args.epochs+1):
+    while epoch < args.epochs:
         scheduler.step()
         lr = scheduler.get_lr()[0]
         logging.info('epoch %d lr %e', epoch, lr)
@@ -168,12 +174,13 @@ def main():
     
         # Evaluate seed archs
         valid_accuracy_list = valid(valid_queue, model, args.arch_pool, criterion)
-
+        epoch += 1
         # Output archs and evaluated error rate
         with open(os.path.join(args.output_dir, 'arch_pool.{}.perf'.format(epoch)), 'w') as f:
             for arch, perf in zip(args.arch_pool, valid_accuracy_list):
                 arch = ' '.join(map(str, arch[0] + arch[1]))
                 f.write('arch: {}\tvalid acc: {}\n'.format(arch, perf))
+        utils.save(args.output_dir, args, model, epoch, step, optimizer)
       
 
 if __name__ == '__main__':
