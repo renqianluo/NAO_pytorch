@@ -3,6 +3,7 @@ import numpy as np
 import logging
 import torch
 import shutil
+import torch.utils.data
 import torchvision.transforms as transforms
 from torch.autograd import Variable
 
@@ -79,6 +80,40 @@ def _data_transforms_cifar10(cutout_size):
         transforms.Normalize(CIFAR_MEAN, CIFAR_STD),
         ])
     return train_transform, valid_transform
+
+
+class NAODataset(torch.utils.data.Dataset):
+    def __init__(self, inputs, targets=None, train=True, sos_id=0, eos_id=0, swap=True):
+        super(NAODataset, self).__init__()
+        assert len(inputs) == len(targets)
+        self.inputs = inputs
+        self.targets = targets
+        self.train = train
+        self.sos_id = sos_id
+        self.eos_id = eos_id
+        self.swap = swap
+    
+    def __getitem__(self, index):
+        encoder_input = self.inputs[index]
+        encoder_target = None
+        if self.targets is not None:
+            encoder_target = self.targets[index]
+        if self.swap:
+            a = np.random.randint(0, 5)
+            b = np.random.randint(0, 5)
+            encoder_input = encoder_input[:4 * a] + encoder_input[4 * a + 2:4 * a + 4] + \
+                            encoder_input[4 * a:4 * a + 2] + encoder_input[4 * (a + 1):20 + 4 * b] + \
+                            encoder_input[20 + 4 * b + 2:20 + 4 * b + 4] + encoder_input[20 + 4 * b:20 + 4 * b + 2] + \
+                            encoder_input[20 + 4 * (b + 1):]
+        decoder_target = encoder_input
+        if self.train:
+            decoder_input = [self.sos_id] + encoder_input[:-1]
+            return encoder_input, encoder_target, decoder_input, decoder_target
+        else:
+            return encoder_input, encoder_target, decoder_target
+    
+    def __len__(self):
+        return len(self.inputs)
 
 
 def count_parameters_in_MB(model):

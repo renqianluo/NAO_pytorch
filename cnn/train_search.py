@@ -26,10 +26,10 @@ parser.add_argument('--data_path', type=str, default='./data')
 parser.add_argument('--output_dir', type=str, default='models')
 parser.add_argument('--seed', type=int, default=None)
 parser.add_argument('--child_sample_policy', type=str, default=None)
-parser.add_argument('--child_batch_size', type=int, default=128)
-parser.add_argument('--child_eval_batch_size', type=int, default=128)
-parser.add_argument('--child_epochs', type=int, default=150)
-parser.add_argument('--child_layers', type=int, default=5)
+parser.add_argument('--child_batch_size', type=int, default=160)
+parser.add_argument('--child_eval_batch_size', type=int, default=500)
+parser.add_argument('--child_epochs', type=int, default=100)
+parser.add_argument('--child_layers', type=int, default=2)
 parser.add_argument('--child_nodes', type=int, default=5)
 parser.add_argument('--child_channels', type=int, default=20)
 parser.add_argument('--child_cutout_size', type=int, default=None)
@@ -40,12 +40,13 @@ parser.add_argument('--child_keep_prob', type=float, default=0.8)
 parser.add_argument('--child_drop_path_keep_prob', type=float, default=1.0)
 parser.add_argument('--child_l2_reg', type=float, default=3e-4)
 parser.add_argument('--child_use_aux_head', action='store_true', default=False)
-parser.add_argument('--child_eval_epochs', type=str, default='30')
+parser.add_argument('--child_eval_epochs', type=str, default='20')
 parser.add_argument('--child_arch_pool', type=str, default=None)
 parser.add_argument('--controller_seed_arch', type=int, default=1000)
+parser.add_argument('--controller_replace', action='store_true', default=False)
 parser.add_argument('--controller_encoder_layers', type=int, default=1)
 parser.add_argument('--controller_encoder_hidden_size', type=int, default=96)
-parser.add_argument('--controller_encoder_emb_size', type=int, default=32)
+parser.add_argument('--controller_encoder_emb_size', type=int, default=48)
 parser.add_argument('--controller_mlp_layers', type=int, default=3)
 parser.add_argument('--controller_mlp_hidden_size', type=int, default=200)
 parser.add_argument('--controller_decoder_layers', type=int, default=1)
@@ -61,7 +62,6 @@ parser.add_argument('--controller_encoder_vocab_size', type=int, default=12)
 parser.add_argument('--controller_decoder_vocab_size', type=int, default=12)
 parser.add_argument('--controller_trade_off', type=float, default=0.8)
 parser.add_argument('--controller_epochs', type=int, default=1000)
-parser.add_argument('--controller_eval_frequency', type=int, default=10)#[TODO rm this inrelease]
 parser.add_argument('--controller_batch_size', type=int, default=100)
 parser.add_argument('--controller_lr', type=float, default=0.001)
 parser.add_argument('--controller_optimizer', type=str, default='adam')
@@ -74,7 +74,8 @@ log_format = '%(asctime)s %(message)s'
 logging.basicConfig(stream=sys.stdout, level=logging.INFO,
     format=log_format, datefmt='%m/%d %I:%M:%S %p')
 
-def child_train(train_queue, model, optimizer, global_step, arch_pool, criterion):
+
+def child_train(train_queue, model, optimizer, global_step, arch_pool, arch_pool_prob, criterion):
     objs = utils.AvgrageMeter()
     top1 = utils.AvgrageMeter()
     top5 = utils.AvgrageMeter()
@@ -85,7 +86,7 @@ def child_train(train_queue, model, optimizer, global_step, arch_pool, criterion
         
         optimizer.zero_grad()
         # sample an arch to train
-        arch = utils.sample_arch(arch_pool)
+        arch = utils.sample_arch(arch_pool, arch_pool_prob)
         logits, aux_logits = model(input, arch, global_step)
         global_step += 1
         loss = criterion(logits, target)
@@ -109,112 +110,78 @@ def child_train(train_queue, model, optimizer, global_step, arch_pool, criterion
     return top1.avg, objs.avg, global_step
 
 
-def nao_train(encoder_input, encoder_target, decoder_target, model, parallel_model, optimizer, params, epoch):
-    logging.info('Training Encoder-Predictor-Decoder')
-    step = 0
-    start_time = time.time()
-    train_epochs = params['train_epochs']
-    for e in range(1, train_epochs + 1):
-        # prepare data
-        N = len(encoder_input)
-        if params['shuffle']:
-            data = list(zip(encoder_input, encoder_target, decoder_target))
-            np.random.shuffle(data)
-            encoder_input, encoder_target, decoder_target = zip(*data)
-        decoder_input = torch.cat((torch.LongTensor([[SOS_ID]] * N), torch.LongTensor(encoder_input)[:, :-1]), dim=1)
-        
-        encoder_train_input = controller_batchify(torch.LongTensor(encoder_input), params['batch_size'], cuda=True)
-        encoder_train_target = controller_batchify(torch.Tensor(encoder_target), params['batch_size'], cuda=True)
-        decoder_train_input = controller_batchify(torch.LongTensor(decoder_input), params['batch_size'], cuda=True)
-        decoder_train_target = controller_batchify(torch.LongTensor(decoder_target), params['batch_size'], cuda=True)
-        
-        epoch += 1
-        total_loss = 0
-        mse = 0
-        cse = 0
-        batch = 0
-        while batch < encoder_train_input.size(0):
-            model.train()
-            optimizer.zero_grad()
-            encoder_train_input_batch = controller_get_batch(encoder_train_input, batch, evaluation=False)
-            encoder_train_target_batch = controller_get_batch(encoder_train_target, batch, evaluation=False)
-            decoder_train_input_batch = controller_get_batch(decoder_train_input, batch, evaluation=False)
-            decoder_train_target_batch = controller_get_batch(decoder_train_target, batch, evaluation=False)
-            predict_value, log_prob, arch = parallel_model(encoder_train_input_batch, decoder_train_input_batch)
-            loss_1 = F.mse_loss(predict_value.squeeze(), encoder_train_target_batch.squeeze())
-            loss_2 = F.nll_loss(log_prob.contiguous().view(-1, log_prob.size(-1)), decoder_train_target_batch.view(-1))
-            loss = params['trade_off'] * loss_1 + (1 - params['trade_off']) * loss_2
-            mse += loss_1.data
-            cse += loss_2.data
-            total_loss += loss.data
-            loss.backward()
-            torch.nn.utils.clip_grad_norm(model.parameters(), params['max_gradient_norm'])
-            optimizer.step()
+def child_valid(valid_queue, model, arch_pool, criterion):
+    valid_acc_list = []
+    for arch in arch_pool:
+        model.eval()
+        # for step, (input, target) in enumerate(valid_queue):
+        inputs, targets = next(valid_queue)
+        inputs = Variable(inputs, volatile=True).cuda()
+        targets = Variable(targets, volatile=True).cuda(async=True)
             
-            step += 1
-            LOG = 100
-            if step % LOG == 0:
-                elapsed = time.time() - start_time
-                cur_loss = total_loss[0] / LOG
-                mse = mse[0] / LOG
-                cse = cse[0] / LOG
-                logging.info('| epoch {:6d} | {:5d}/{:5d} batches | lr {:02.4f} | ms/batch {:5.2f} | '
-                             'mse {:5.6f} | cross entropy {:5.6f} | loss {:5.6f}'.format(
-                    e, batch + 1, len(encoder_train_input), optimizer.param_groups[0]['lr'],
-                       elapsed * 1000 / LOG, mse, cse, cur_loss))
-                total_loss = 0
-                mse = 0
-                cse = 0
-                start_time = time.time()
-            batch += 1
-        # [TODO rm this inrelease]
-        if e % params['eval_frequency'] == 0:
-            evaluate(encoder_input, encoder_target, decoder_target, model, parallel_model, params, epoch)
-        if e % params['save_frequency'] == 0:
-            save_checkpoint(model, optimizer, epoch, params['model_dir'])
-            logging.info('Saving Model!')
-    return epoch
+        logits, _ = model(inputs, arch)
+        loss = criterion(logits, targets)
+            
+        prec1, prec5 = utils.accuracy(logits, targets, topk=(1, 5))
+        valid_acc_list.append(prec1)
+        
+        logging.info('valid arch %e top1 %f top5 %f', loss, prec1, prec5)
+        
+    return valid_acc_list
 
 
-def nao_valid(encoder_input, encoder_target, decoder_target, model, parallel_model, params, epoch):
-    encoder_test_input = controller_batchify(torch.LongTensor(encoder_input), params['batch_size'], cuda=True)
-    i = 0
-    predict_value_list = []
-    arch_list = []
-    test_start_time = time.time()
-    
-    while i < encoder_test_input.size(0):
-        model.eval()
-        encoder_test_input_batch = controller_get_batch(encoder_test_input, i, evaluation=True)
-        predict_value, logits, arch = parallel_model(encoder_test_input_batch)
-        predict_value_list.extend(predict_value.data.squeeze().tolist())
-        arch_list.extend(arch.data.squeeze().tolist())
-        i += 1
-    
-    ground_truth_perf_list = encoder_target
-    ground_truth_arch_list = decoder_target
-    
-    pairwise_acc = pairwise_accuracy(ground_truth_perf_list, predict_value_list)
-    hamming_dis = hamming_distance(ground_truth_arch_list, arch_list)
-    
-    test_time = time.time() - test_start_time
-    logging.info("Evaluation on training data\n")
-    logging.info('| epoch {:3d} | pairwise accuracy {:<6.6f} | hamming distance {:<6.6f} | {:<6.2f} secs'.format(
-        epoch, pairwise_acc, hamming_dis, test_time))
+def nao_train(train_queue, model, optimizer, trade_off, grad_bound=5.0):
+    objs = utils.AvgrageMeter()
+    mse = utils.AvgrageMeter()
+    nll = utils.AvgrageMeter()
+    model.train()
+    for step, (encoder_input, encoder_target, decoder_input, decoder_target) in enumerate(train_queue):
+        encoder_input = Variable(encoder_input).cuda()
+        encoder_target = Variable(encoder_target).cuda(async=True)
+        decoder_input = Variable(decoder_input).cuda()
+        decoder_target = Variable(decoder_target).cuda(async=True)
+        
+        optimizer.zero_grad()
+        predict_value, log_prob, arch = model(encoder_input, decoder_input)
+        loss_1 = F.mse_loss(predict_value.squeeze(), encoder_target.squeeze())
+        loss_2 = F.nll_loss(log_prob.contiguous().view(-1, log_prob.size(-1)), decoder_target.view(-1))
+        loss = trade_off * loss_1 + (1 - trade_off) * loss_2
+        loss.backward()
+        torch.nn.utils.clip_grad_norm(model.parameters(), grad_bound)
+        optimizer.step()
+        
+        n = encoder_input.size(0)
+        objs.update(loss.data[0], n)
+        mse.update(loss_1.data[0], n)
+        nll.update(loss_2.data[0], n)
+        
+    return objs.avg, mse.avg, nll.avg
 
 
-def nao_infer(encoder_input, model, parallel_model, params):
-    logging.info(
-        'Generating new architectures using gradient descent with step size {}'.format(params['predict_lambda']))
-    logging.info('Preparing data')
-    encoder_infer_input = controller_batchify(torch.LongTensor(encoder_input), params['batch_size'], cuda=True)
-    
+def nao_valid(queue, model):
+    pa = utils.AvgrageMeter()
+    hs = utils.AvgrageMeter()
+    model.eval()
+    for step, (encoder_input, encoder_target, decoder_target) in enumerate(queue):
+        encoder_input = Variable(encoder_input).cuda()
+        encoder_target = Variable(encoder_target).cuda(async=True)
+        decoder_target = Variable(decoder_target).cuda(async=True)
+        predict_value, logits, arch = model(encoder_input)
+        n = encoder_input.size(0)
+        pairwise_acc = utils.pairwise_accuracy(encoder_target.data[0].squeeze().tolist(), predict_value.data[0].squeeze().tolist())
+        hamming_dis = utils.hamming_distance(decoder_target.data[0].squeeze().tolist(), arch.data[0].squeeze().tolist())
+        pa.update(pairwise_acc, n)
+        hs.update(hamming_dis, n)
+    return pa.avg, hs.avg
+
+
+def nao_infer(queue, model, step):
     new_arch_list = []
-    for i in range(encoder_infer_input.size(0)):
-        model.eval()
+    model.eval()
+    for i, (encoder_input) in enumerate(queue):
+        encoder_input = Variable(encoder_input).cuda()
         model.zero_grad()
-        encoder_infer_input_batch = controller_get_batch(encoder_infer_input, i, evaluation=False)
-        new_arch = parallel_model.generate_new_arch(encoder_infer_input_batch, params['predict_lambda'])
+        new_arch = model.generate_new_arch(encoder_input, step)
         new_arch_list.extend(new_arch.data.squeeze().tolist())
     return new_arch_list
 
@@ -237,13 +204,13 @@ def main():
         with open(args.child_arch_pool) as f:
             archs = f.read().splitlines()
             archs = list(map(utils.build_dag, archs))
-            args.child_arch_pool = archs
+            child_arch_pool = archs
     if  os.path.exists(os.path.join(args.output_dir, 'arch_pool')):
         logging.info('Architecture pool is founded, loading')
         with open(os.path.join(args.output_dir, 'arch_pool')) as f:
             archs = f.read().splitlines()
             archs = list(map(utils.build_dag, archs))
-            args.child_arch_pool = archs
+            child_arch_pool = archs
 
     args.child_eval_epochs = eval(args.child_eval_epochs)
     train_transform, valid_transform = utils._data_transforms_cifar10(args.child_cutout_size)
@@ -279,21 +246,15 @@ def main():
 
     # Train child model
     if args.child_arch_pool is None:
-        arch_pool = utils.generate_arch(args.controller_seed_arch, args.child_nodes, 5)  # [[[conv],[reduc]]]
-        args.child_arch_pool = arch_pool
-        args.child_arch_pool_prob = None
+        child_arch_pool = utils.generate_arch(args.controller_seed_arch, args.child_nodes, 5)  # [[[conv],[reduc]]]
+        child_arch_pool_prob = None
     else:
         if args.child_sample_policy == 'uniform':
-            args.child_arch_pool_prob = None
+            child_arch_pool_prob = None
         elif args.child_sample_policy == 'params':
-            args.child_arch_pool_prob = calculate_params(args.child_arch_pool)
+            child_arch_pool_prob = calculate_params(child_arch_pool)
         elif args.child_sample_policy == 'valid_performance':
-            args.child_arch_pool_prob = child_valid(valid_queue, model, args.child_arch_pool)
-        elif args.child_sample_policy == 'predicted_performance':
-            encoder_input = list(map(lambda x: utils.parse_arch_to_seq(x[0], 2) + \
-                                               utils.parse_arch_to_seq(x[1], 2), args.child_arch_pool))
-            predicted_error_rate = controller.test(args, encoder_input)
-            args.child_arch_pool_prob = [1 - i[0] for i in predicted_error_rate]
+            child_arch_pool_prob = child_valid(valid_queue, model, child_arch_pool)
         else:
             raise ValueError('Child model arch pool sample policy is not provided!')
 
@@ -302,20 +263,21 @@ def main():
         lr = scheduler.get_lr()[0]
         logging.info('epoch %d lr %e', epoch, lr)
         # sample an arch to train
-        train_acc, train_obj, step = child_train(train_queue, model, optimizer, step, args.child_arch_pool, criterion)
+        train_acc, train_obj, step = child_train(train_queue, model, optimizer, step, child_arch_pool, child_arch_pool_prob, criterion)
         logging.info('train_acc %f', train_acc)
     
-        if isinstance(args.child_eval_epochs, int):
-            if epoch % args.child_eval_every_epochs != 0:
+        if isinstance(args.child_epochs, int):
+            if epoch % args.child_eval_epochs != 0:
                 continue
         else:
+            assert isinstance(args.child_eval_epochs, list)
             if epoch not in args.child_eval_epochs:
                 continue
         # Evaluate seed archs
-        valid_accuracy_list = child_valid(valid_queue, model, args.child_arch_pool, criterion)
+        valid_accuracy_list = child_valid(valid_queue, model, child_arch_pool, criterion)
 
         # Output archs and evaluated error rate
-        old_archs = args.child_arch_pool
+        old_archs = child_arch_pool
         old_archs_perf = [1 - i for i in valid_accuracy_list]
 
         old_archs_sorted_indices = np.argsort(old_archs_perf)
@@ -331,15 +293,17 @@ def main():
                             fa_latest.write('{}\n'.format(arch))
                             fp.write('{}\n'.format(perf))
                             fp_latest.write('{}\n'.format(perf))
+                            
+        if epoch == args.child_epochs:
+            return
 
         # Train Encoder-Predictor-Decoder
-        encoder_input = list(map(lambda x: utils.parse_arch_to_seq(x[0], 2) + \
-                                           utils.parse_arch_to_seq(x[1], 2), old_archs))
+        logging.info('Training Encoder-Predictor-Decoder')
+        encoder_input = list(map(lambda x: utils.parse_arch_to_seq(x[0], 2) + utils.parse_arch_to_seq(x[1], 2), old_archs))
         # [[conv, reduc]]
         min_val = min(old_archs_perf)
         max_val = max(old_archs_perf)
         encoder_target = [(i - min_val) / (max_val - min_val) for i in old_archs_perf]
-        decoder_target = copy.copy(encoder_input)
 
         nao = NAO(
             args.controller_encoder_layers,
@@ -358,41 +322,53 @@ def main():
             args.controller_decoder_dropout,
             args.controller_decoder_length,
         )
+        logging.info("param size = %fMB", utils.count_parameters_in_MB(nao))
         nao = nao.cuda()
+        nao_train_dataset = utils.NAODataset(encoder_input, encoder_target, True, swap=True)
+        nao_valid_dataset = utils.NAODataset(encoder_input, encoder_target, True)
         nao_train_queue = torch.utils.data.DataLoader(
-            torch., batch_size=args.child_batch_size,
-            sampler=torch.utils.data.sampler.SubsetRandomSampler(indices[:split]),
-            pin_memory=True, num_workers=16)
-        args.controller_batches_per_epoch = np.ceil(len(encoder_input) / args.controller_batch_size)
-        # if clean controller model
-        controller.train(args, encoder_input, encoder_target, decoder_target)
+            nao_train_dataset, batch_size=args.controller_batch_size, shuffle=True, pin_memory=True)
+        nao_valid_queue = torch.utils.data.DataLoader(
+            nao_valid_dataset, batch_size=len(nao_valid_dataset), shuffle=False, pin_memory=True)
+        nao_optimizer = torch.optim.Adam(nao.parameters(), lr=args.controller_lr, weight_decay=args.l2_reg)
+        for nao_epoch in range(1, args.controller_epochs+1):
+            nao_loss, nao_mse, nao_ce = nao_train(nao_train_queue, nao, nao_optimizer, args.controller_trade_off)
+            logging.info("epoch %04d train loss %.2f mse %.2f ce %.2f", nao_epoch, nao_loss, nao_mse, nao_ce)
+            if nao_epoch % 100 == 0:
+                pa, hs = nao_valid(nao_valid_queue, nao)
+                logging.info("Evaluation on training data\n")
+                logging.info('epoch %04d pairwise accuracy %6.2f hamming distance %6.2f', epoch, pa, hs)
 
         # Generate new archs
-        # old_archs = old_archs[:450]
         new_archs = []
         max_step_size = 100
-        args.controller_predict_lambda = 0
-        top100_archs = list(map(lambda x: utils.parse_arch_to_seq(x[0], branch_length) + \
-                                          utils.parse_arch_to_seq(x[1], branch_length), old_archs[:100]))
-        while len(new_archs) < 500:
-            args.controller_predict_lambda += 1
-            new_arch = controller.predict(args, top100_archs)
+        predict_step_size = 0
+        top100_archs = list(map(lambda x: utils.parse_arch_to_seq(x[0], 2) + utils.parse_arch_to_seq(x[1], 2), old_archs[:100]))
+        nao_infer_dataset = utils.NAODataset(top100_archs, None, False)
+        nao_infer_queue = torch.utils.data.DataLoader(
+            nao_infer_dataset, batch_size=len(nao_infer_dataset), shuffle=False, pin_memory=True)
+        while len(new_archs) < 300:
+            predict_step_size += 1
+            new_arch = nao_infer(nao_infer_queue, nao, predict_step_size)
             for arch in new_arch:
                 if arch not in encoder_input and arch not in new_archs:
                     new_archs.append(arch)
-                if len(new_archs) >= 500:
+                if len(new_archs) >= 300:
                     break
-            logging.info('{} new archs generated now'.format(len(new_archs)))
-            if args.controller_predict_lambda > max_step_size:
+            logging.info('%d new archs generated now', len(new_archs))
+            if predict_step_size > max_step_size:
                 break
                 # [[conv, reduc]]
-        new_archs = list(map(lambda x: utils.parse_seq_to_arch(x, branch_length), new_archs))  # [[[conv],[reduc]]]
+        new_archs = list(map(lambda x: utils.parse_seq_to_arch(x, 2), new_archs))  # [[[conv],[reduc]]]
         num_new_archs = len(new_archs)
-        logging.info("Generate {} new archs".format(num_new_archs))
-        new_arch_pool = old_archs[:len(old_archs) - (num_new_archs + 50)] + new_archs + utils.generate_arch(50, 5, 5)
-        logging.info("Totally {} archs now to train".format(len(new_arch_pool)))
-        args.child_arch_pool = new_arch_pool
-        with open(os.path.join(args.child_model_dir, 'arch_pool'), 'w') as f:
+        logging.info("Generate %d new archs", num_new_archs)
+        if args.replace:
+            new_arch_pool = old_archs[:len(old_archs) - (num_new_archs + 50)] + new_archs + utils.generate_arch(50, 5, 5)
+        else:
+            new_arch_pool = old_archs + new_archs + utils.generate_arch(100, 5, 5)
+        logging.info("Totally %d archs now to train", len(new_arch_pool))
+        child_arch_pool = new_arch_pool
+        with open(os.path.join(args.output_dir, 'arch_pool'), 'w') as f:
             for arch in new_arch_pool:
                 arch = ' '.join(map(str, arch[0] + arch[1]))
                 f.write('{}\n'.format(arch))
