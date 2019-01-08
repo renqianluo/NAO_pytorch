@@ -85,7 +85,8 @@ def _data_transforms_cifar10(cutout_size):
 class NAODataset(torch.utils.data.Dataset):
     def __init__(self, inputs, targets=None, train=True, sos_id=0, eos_id=0, swap=True):
         super(NAODataset, self).__init__()
-        assert len(inputs) == len(targets)
+        if targets is not None:
+            assert len(inputs) == len(targets)
         self.inputs = inputs
         self.targets = targets
         self.train = train
