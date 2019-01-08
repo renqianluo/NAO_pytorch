@@ -59,7 +59,7 @@ def nao_train(train_queue, model, optimizer):
     model.train()
     for step, (encoder_input, encoder_target) in enumerate(train_queue):
         n = encoder_input.size(0)
-        decoder_input = torch.cat([torch.LongTensor([0 for i in range(n)]), encoder_input[:, :-1]], dim=1)
+        decoder_input = torch.cat([torch.LongTensor([[0] for i in range(n)]), encoder_input[:, :-1]], dim=1)
         encoder_input = Variable(encoder_input).cuda()
         encoder_target = Variable(encoder_target).cuda(async=True)
         decoder_input = Variable(decoder_input).cuda()
