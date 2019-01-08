@@ -23,7 +23,7 @@ parser = argparse.ArgumentParser()
 # Basic model parameters.
 parser.add_argument('--output_dir', type=str, default='models')
 parser.add_argument('--seed', type=int, default=None)
-parser.add_argument('--controller_num_seed_arch', type=int, default=1000)
+parser.add_argument('--controller_seed_arch', type=int, default=1000)
 parser.add_argument('--controller_seed_arch', type=int, default=1000)
 parser.add_argument('--controller_new_arch', type=int, default=300)
 parser.add_argument('--controller_random_arch', type=int, default=100)
@@ -110,7 +110,7 @@ def nao_infer(queue, model, step):
     return new_arch_list
 
 def main():
-    arch_pool = utils.generate_arch(args.seed_arch, 5, 5)
+    arch_pool = utils.generate_arch(args.controller_seed_arch, 5, 5)
     encoder_input = list(map(lambda x: utils.parse_arch_to_seq(x[0], 2) + utils.parse_arch_to_seq(x[1], 2), arch_pool))
     encoder_target = [np.random.random() for i in range(args.seed_arch)]
     nao = NAO(
