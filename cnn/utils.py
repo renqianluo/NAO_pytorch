@@ -97,7 +97,7 @@ class NAODataset(torch.utils.data.Dataset):
         encoder_input = self.inputs[index]
         encoder_target = None
         if self.targets is not None:
-            encoder_target = self.targets[index]
+            encoder_target = [self.targets[index]]
         if self.swap:
             a = np.random.randint(0, 5)
             b = np.random.randint(0, 5)
