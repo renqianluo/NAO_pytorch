@@ -65,8 +65,7 @@ def nao_train(train_queue, model, optimizer):
         encoder_target = sample['encoder_target']
         decoder_input = sample['decoder_input']
         decoder_target = sample['decoder_target']
-        n = encoder_input.size(0)
-        #decoder_input = torch.cat([torch.LongTensor([[0] for i in range(n)]), encoder_input[:, :-1]], dim=1)
+
         encoder_input = Variable(encoder_input).cuda()
         encoder_target = Variable(encoder_target).cuda(async=True)
         decoder_input = Variable(decoder_input).cuda()
@@ -93,10 +92,14 @@ def nao_valid(queue, model):
     pa = utils.AvgrageMeter()
     hs = utils.AvgrageMeter()
     model.eval()
-    for step, (encoder_input, encoder_target) in enumerate(queue):
-        decoder_target = Variable(encoder_input, volatile=True).cuda(async=True)
+    for step, sample in enumerate(queue):
+        encoder_input = sample['encoder_input']
+        encoder_target = sample['encoder_target']
+        decoder_target = sample['decoder_target']
+        
         encoder_input = Variable(encoder_input, volatile=True).cuda()
         encoder_target = Variable(encoder_target, volatile=True).cuda(async=True)
+        decoder_target = Variable(decoder_target, volatile=True).cuda(async=True)
         
         predict_value, logits, arch = model(encoder_input)
         n = encoder_input.size(0)
@@ -111,7 +114,8 @@ def nao_valid(queue, model):
 def nao_infer(queue, model, step):
     new_arch_list = []
     model.eval()
-    for i, encoder_input in enumerate(queue):
+    for i, sample in enumerate(queue):
+        encoder_input = encoder_input['encoder_input']
         encoder_input = Variable(encoder_input).cuda()
         model.zero_grad()
         new_arch = model.generate_new_arch(encoder_input, step)
