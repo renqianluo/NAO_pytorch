@@ -66,8 +66,7 @@ class Encoder(nn.Module):
         out = F.normalize(out, 2, dim=-1)
         arch_emb = out
         
-        for i in range(self.mlp_layers):
-            out = self.mlp(out)
+        out = self.mlp(out)
         out = self.regressor(out)
         predict_value = F.sigmoid(out)
         return encoder_outputs, encoder_state, arch_emb, predict_value
