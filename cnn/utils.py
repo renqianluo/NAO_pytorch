@@ -105,12 +105,10 @@ class NAODataset(torch.utils.data.Dataset):
                             encoder_input[4 * a:4 * a + 2] + encoder_input[4 * (a + 1):20 + 4 * b] + \
                             encoder_input[20 + 4 * b + 2:20 + 4 * b + 4] + encoder_input[20 + 4 * b:20 + 4 * b + 2] + \
                             encoder_input[20 + 4 * (b + 1):]
-        decoder_target = encoder_input
         if self.train:
-            decoder_input = [self.sos_id] + encoder_input[:-1]
-            return encoder_input, encoder_target, decoder_input, decoder_target
+            return torch.Tensor(encoder_input), encoder_target
         else:
-            return encoder_input, encoder_target, decoder_target
+            return torch.Tensor(encoder_input)
     
     def __len__(self):
         return len(self.inputs)
