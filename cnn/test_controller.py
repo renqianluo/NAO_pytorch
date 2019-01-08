@@ -115,7 +115,7 @@ def nao_infer(queue, model, step):
     new_arch_list = []
     model.eval()
     for i, sample in enumerate(queue):
-        encoder_input = encoder_input['encoder_input']
+        encoder_input = sample['encoder_input']
         encoder_input = Variable(encoder_input).cuda()
         model.zero_grad()
         new_arch = model.generate_new_arch(encoder_input, step)
