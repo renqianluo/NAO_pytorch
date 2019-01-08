@@ -58,10 +58,10 @@ def nao_train(train_queue, model, optimizer):
     nll = utils.AvgrageMeter()
     model.train()
     for step, (encoder_input, encoder_target, decoder_input, decoder_target) in enumerate(train_queue):
-        encoder_input = Variable(encoder_input).cuda()
-        encoder_target = Variable(encoder_target).cuda(async=True)
-        decoder_input = Variable(decoder_input).cuda()
-        decoder_target = Variable(decoder_target).cuda(async=True)
+        encoder_input = Variable(torch.Tensor(encoder_input)).cuda()
+        encoder_target = Variable(torch.Tensor(encoder_target)).cuda(async=True)
+        decoder_input = Variable(torch.Tensor(decoder_input)).cuda()
+        decoder_target = Variable(torch.Tensor(decoder_target)).cuda(async=True)
         
         optimizer.zero_grad()
         predict_value, log_prob, arch = model(encoder_input, decoder_input)
@@ -85,9 +85,9 @@ def nao_valid(queue, model):
     hs = utils.AvgrageMeter()
     model.eval()
     for step, (encoder_input, encoder_target, decoder_target) in enumerate(queue):
-        encoder_input = Variable(encoder_input, volatile=True).cuda()
-        encoder_target = Variable(encoder_target, volatile=True).cuda(async=True)
-        decoder_target = Variable(decoder_target, volatile=True).cuda(async=True)
+        encoder_input = Variable(torch.Tensor(encoder_input), volatile=True).cuda()
+        encoder_target = Variable(torch.Tensor(encoder_target), volatile=True).cuda(async=True)
+        decoder_target = Variable(torch.Tensor(decoder_target), volatile=True).cuda(async=True)
         predict_value, logits, arch = model(encoder_input)
         n = encoder_input.size(0)
         pairwise_acc = utils.pairwise_accuracy(encoder_target.data[0].squeeze().tolist(),
@@ -102,7 +102,7 @@ def nao_infer(queue, model, step):
     new_arch_list = []
     model.eval()
     for i, (encoder_input) in enumerate(queue):
-        encoder_input = Variable(encoder_input).cuda()
+        encoder_input = Variable(torch.Tensor(encoder_input)).cuda()
         model.zero_grad()
         new_arch = model.generate_new_arch(encoder_input, step)
         new_arch_list.extend(new_arch.data.squeeze().tolist())
