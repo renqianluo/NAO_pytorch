@@ -96,7 +96,7 @@ def child_train(train_queue, model, optimizer, global_step, arch_pool, arch_pool
             aux_loss = criterion(aux_logits, target)
             loss += 0.4 * aux_loss
         loss.backward()
-        nn.utils.clip_grad_norm(model.parameters(), args.grad_bound)
+        nn.utils.clip_grad_norm(model.parameters(), args.child_grad_bound)
         optimizer.step()
         
         prec1, prec5 = utils.accuracy(logits, target, topk=(1, 5))
@@ -133,7 +133,7 @@ def child_valid(valid_queue, model, arch_pool, criterion):
     return valid_acc_list
 
 
-def nao_train(train_queue, model, optimizer, trade_off, grad_bound=5.0):
+def nao_train(train_queue, model, optimizer):
     objs = utils.AvgrageMeter()
     mse = utils.AvgrageMeter()
     nll = utils.AvgrageMeter()
@@ -148,9 +148,9 @@ def nao_train(train_queue, model, optimizer, trade_off, grad_bound=5.0):
         predict_value, log_prob, arch = model(encoder_input, decoder_input)
         loss_1 = F.mse_loss(predict_value.squeeze(), encoder_target.squeeze())
         loss_2 = F.nll_loss(log_prob.contiguous().view(-1, log_prob.size(-1)), decoder_target.view(-1))
-        loss = trade_off * loss_1 + (1 - trade_off) * loss_2
+        loss = args.controller_trade_off * loss_1 + (1 - args.controller_trade_off) * loss_2
         loss.backward()
-        torch.nn.utils.clip_grad_norm(model.parameters(), grad_bound)
+        torch.nn.utils.clip_grad_norm(model.parameters(), args.controller_grad_bound)
         optimizer.step()
         
         n = encoder_input.size(0)
@@ -337,7 +337,7 @@ def main():
             nao_valid_dataset, batch_size=len(nao_valid_dataset), shuffle=False, pin_memory=True)
         nao_optimizer = torch.optim.Adam(nao.parameters(), lr=args.controller_lr, weight_decay=args.l2_reg)
         for nao_epoch in range(1, args.controller_epochs+1):
-            nao_loss, nao_mse, nao_ce = nao_train(nao_train_queue, nao, nao_optimizer, args.controller_trade_off)
+            nao_loss, nao_mse, nao_ce = nao_train(nao_train_queue, nao, nao_optimizer)
             logging.info("epoch %04d train loss %.2f mse %.2f ce %.2f", nao_epoch, nao_loss, nao_mse, nao_ce)
             if nao_epoch % 100 == 0:
                 pa, hs = nao_valid(nao_valid_queue, nao)
