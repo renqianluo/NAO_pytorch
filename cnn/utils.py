@@ -106,7 +106,7 @@ class NAODataset(torch.utils.data.Dataset):
                             encoder_input[20 + 4 * b + 2:20 + 4 * b + 4] + encoder_input[20 + 4 * b:20 + 4 * b + 2] + \
                             encoder_input[20 + 4 * (b + 1):]
         if self.train:
-            return torch.LongTensor(encoder_input), encoder_target
+            return torch.LongTensor(encoder_input), torch.FloatTensor(encoder_target)
         else:
             return torch.LongTensor(encoder_input)
     
