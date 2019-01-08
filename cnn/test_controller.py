@@ -146,7 +146,7 @@ def main():
     logging.info("param size = %fMB", utils.count_parameters_in_MB(nao))
     nao = nao.cuda()
     nao_train_dataset = utils.NAODataset(encoder_input, encoder_target, True, swap=True)
-    nao_valid_dataset = utils.NAODataset(encoder_input, encoder_target, True)
+    nao_valid_dataset = utils.NAODataset(encoder_input, encoder_target, False)
     nao_train_queue = torch.utils.data.DataLoader(
         nao_train_dataset, batch_size=args.controller_batch_size, shuffle=True, pin_memory=True)
     nao_valid_queue = torch.utils.data.DataLoader(
