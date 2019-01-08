@@ -11,7 +11,7 @@ from decoder import decoder
 
 SOS_ID = 0
 EOS_ID = 0
-
+INITRANGE=0.04
 
 class NAO(nn.Module):
     def __init__(self,

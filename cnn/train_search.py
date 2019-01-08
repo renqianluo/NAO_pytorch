@@ -335,7 +335,7 @@ def main():
             nao_train_dataset, batch_size=args.controller_batch_size, shuffle=True, pin_memory=True)
         nao_valid_queue = torch.utils.data.DataLoader(
             nao_valid_dataset, batch_size=len(nao_valid_dataset), shuffle=False, pin_memory=True)
-        nao_optimizer = torch.optim.Adam(nao.parameters(), lr=args.controller_lr, weight_decay=args.l2_reg)
+        nao_optimizer = torch.optim.Adam(nao.parameters(), lr=args.controller_lr, weight_decay=args.controller_l2_reg)
         for nao_epoch in range(1, args.controller_epochs+1):
             nao_loss, nao_mse, nao_ce = nao_train(nao_train_queue, nao, nao_optimizer)
             logging.info("epoch %04d train loss %.2f mse %.2f ce %.2f", nao_epoch, nao_loss, nao_mse, nao_ce)
@@ -381,4 +381,4 @@ def main():
   
 
 if __name__ == '__main__':
-  main()
+    main()
