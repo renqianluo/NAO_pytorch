@@ -117,7 +117,7 @@ def child_valid(valid_queue, model, arch_pool, criterion):
     for i, arch in enumerate(arch_pool):
         model.eval()
         # for step, (input, target) in enumerate(valid_queue):
-        inputs, targets = next(valid_queue)
+        inputs, targets = next(iter(valid_queue))
         inputs = Variable(inputs, volatile=True).cuda()
         targets = Variable(targets, volatile=True).cuda(async=True)
             
@@ -166,9 +166,9 @@ def nao_valid(queue, model):
     hs = utils.AvgrageMeter()
     model.eval()
     for step, (encoder_input, encoder_target, decoder_target) in enumerate(queue):
-        encoder_input = Variable(encoder_input).cuda()
-        encoder_target = Variable(encoder_target).cuda(async=True)
-        decoder_target = Variable(decoder_target).cuda(async=True)
+        encoder_input = Variable(encoder_input, volatile=True).cuda()
+        encoder_target = Variable(encoder_target, volatile=True).cuda(async=True)
+        decoder_target = Variable(decoder_target, volatile=True).cuda(async=True)
         predict_value, logits, arch = model(encoder_input)
         n = encoder_input.size(0)
         pairwise_acc = utils.pairwise_accuracy(encoder_target.data[0].squeeze().tolist(), predict_value.data[0].squeeze().tolist())
