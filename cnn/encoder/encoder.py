@@ -53,7 +53,6 @@ class Encoder(nn.Module):
     def forward(self, x):
         embedded = self.embedding(x)
         if self.source_length != self.length:
-            logging.info('Concacting source sequence along depth')
             assert self.source_length % self.length == 0
             ratio = self.source_length // self.length
             embedded = embedded.view(-1, self.source_length // ratio, ratio * self.emb_size)

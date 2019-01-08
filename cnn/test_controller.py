@@ -51,6 +51,9 @@ parser.add_argument('--controller_optimizer', type=str, default='adam')
 parser.add_argument('--controller_grad_bound', type=float, default=5.0)
 args = parser.parse_args()
 
+log_format = '%(asctime)s %(message)s'
+logging.basicConfig(stream=sys.stdout, level=logging.INFO,
+    format=log_format, datefmt='%m/%d %I:%M:%S %p')
 
 def nao_train(train_queue, model, optimizer):
     objs = utils.AvgrageMeter()
