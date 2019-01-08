@@ -43,6 +43,8 @@ parser.add_argument('--child_use_aux_head', action='store_true', default=False)
 parser.add_argument('--child_eval_epochs', type=str, default='20')
 parser.add_argument('--child_arch_pool', type=str, default=None)
 parser.add_argument('--controller_seed_arch', type=int, default=1000)
+parser.add_argument('--controller_new_arch', type=int, default=300)
+parser.add_argument('--controller_random_arch', type=int, default=100)
 parser.add_argument('--controller_replace', action='store_true', default=False)
 parser.add_argument('--controller_encoder_layers', type=int, default=1)
 parser.add_argument('--controller_encoder_hidden_size', type=int, default=96)
@@ -104,15 +106,15 @@ def child_train(train_queue, model, optimizer, global_step, arch_pool, arch_pool
         top5.update(prec5.data[0], n)
         
         if step % 100 == 0:
-            logging.info('train %03d loss %e top1 %f top5 %f', step, objs.avg, top1.avg, top5.avg)
-            logging.info('arch: %s', ' '.join(map(str, arch[0] + arch[1])))
+            logging.info('Train %03d loss %e top1 %f top5 %f', step, objs.avg, top1.avg, top5.avg)
+            logging.info('Arch: %s', ' '.join(map(str, arch[0] + arch[1])))
 
     return top1.avg, objs.avg, global_step
 
 
 def child_valid(valid_queue, model, arch_pool, criterion):
     valid_acc_list = []
-    for arch in arch_pool:
+    for i, arch in enumerate(arch_pool):
         model.eval()
         # for step, (input, target) in enumerate(valid_queue):
         inputs, targets = next(valid_queue)
@@ -125,7 +127,8 @@ def child_valid(valid_queue, model, arch_pool, criterion):
         prec1, prec5 = utils.accuracy(logits, targets, topk=(1, 5))
         valid_acc_list.append(prec1)
         
-        logging.info('valid arch %e top1 %f top5 %f', loss, prec1, prec5)
+        if (i+1) % 100 == 0:
+            logging.info('Valid arch %e\n loss %.2f top1 %f top5 %f', arch, loss, prec1, prec5)
         
     return valid_acc_list
 
@@ -205,7 +208,7 @@ def main():
             archs = f.read().splitlines()
             archs = list(map(utils.build_dag, archs))
             child_arch_pool = archs
-    if  os.path.exists(os.path.join(args.output_dir, 'arch_pool')):
+    if os.path.exists(os.path.join(args.output_dir, 'arch_pool')):
         logging.info('Architecture pool is founded, loading')
         with open(os.path.join(args.output_dir, 'arch_pool')) as f:
             archs = f.read().splitlines()
@@ -246,6 +249,7 @@ def main():
 
     # Train child model
     if args.child_arch_pool is None:
+        logging.info('Architecture pool is not provided, randomly generating now')
         child_arch_pool = utils.generate_arch(args.controller_seed_arch, args.child_nodes, 5)  # [[[conv],[reduc]]]
         child_arch_pool_prob = None
     else:
@@ -258,6 +262,7 @@ def main():
         else:
             raise ValueError('Child model arch pool sample policy is not provided!')
 
+    step = 0
     for epoch in range(1, args.child_epochs + 1):
         scheduler.step()
         lr = scheduler.get_lr()[0]
@@ -295,7 +300,7 @@ def main():
                             fp_latest.write('{}\n'.format(perf))
                             
         if epoch == args.child_epochs:
-            return
+            break
 
         # Train Encoder-Predictor-Decoder
         logging.info('Training Encoder-Predictor-Decoder')
@@ -347,13 +352,13 @@ def main():
         nao_infer_dataset = utils.NAODataset(top100_archs, None, False)
         nao_infer_queue = torch.utils.data.DataLoader(
             nao_infer_dataset, batch_size=len(nao_infer_dataset), shuffle=False, pin_memory=True)
-        while len(new_archs) < 300:
+        while len(new_archs) < args.controller_new_arch:
             predict_step_size += 1
             new_arch = nao_infer(nao_infer_queue, nao, predict_step_size)
             for arch in new_arch:
                 if arch not in encoder_input and arch not in new_archs:
                     new_archs.append(arch)
-                if len(new_archs) >= 300:
+                if len(new_archs) >= args.controller_new_arch:
                     break
             logging.info('%d new archs generated now', len(new_archs))
             if predict_step_size > max_step_size:
@@ -363,9 +368,10 @@ def main():
         num_new_archs = len(new_archs)
         logging.info("Generate %d new archs", num_new_archs)
         if args.replace:
-            new_arch_pool = old_archs[:len(old_archs) - (num_new_archs + 50)] + new_archs + utils.generate_arch(50, 5, 5)
+            new_arch_pool = old_archs[:len(old_archs) - (num_new_archs + args.controller_random_arch)] + \
+                            new_archs + utils.generate_arch(args.controller_random_arch, 5, 5)
         else:
-            new_arch_pool = old_archs + new_archs + utils.generate_arch(100, 5, 5)
+            new_arch_pool = old_archs + new_archs + utils.generate_arch(args.controller_random_arch, 5, 5)
         logging.info("Totally %d archs now to train", len(new_arch_pool))
         child_arch_pool = new_arch_pool
         with open(os.path.join(args.output_dir, 'arch_pool'), 'w') as f:
