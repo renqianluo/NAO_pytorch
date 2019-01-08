@@ -169,6 +169,7 @@ def main():
     nao_infer_queue = torch.utils.data.DataLoader(nao_infer_dataset, batch_size=len(nao_infer_dataset), shuffle=False, pin_memory=True)
     while len(new_archs) < args.controller_new_arch:
         predict_step_size += 1
+        logging.info('Generate new architectures with step size %d', predict_step_size)
         new_arch = nao_infer(nao_infer_queue, nao, predict_step_size)
         for arch in new_arch:
             if arch not in encoder_input and arch not in new_archs:
