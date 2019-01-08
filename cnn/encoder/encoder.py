@@ -39,12 +39,12 @@ class Encoder(nn.Module):
         self.mlp = nn.Sequential()
         for i in range(self.mlp_layers):
             if i == 0:
-                self.mlp.add_module(nn.Sequential(
+                self.mlp.add_module('layer_{}'.format(i), nn.Sequential(
                     nn.Linear(self.hidden_size, self.mlp_hidden_size),
                     nn.ReLU(inplace=False),
                     nn.Dropout(p=mlp_dropout)))
             else:
-                self.mlp.add_module(nn.Sequential(
+                self.mlp.add_module('layer_{}'.format(i), nn.Sequential(
                     nn.Linear(self.mlp_hidden_size, self.mlp_hidden_size),
                     nn.ReLU(inplace=False),
                     nn.Dropout(p=mlp_dropout)))
