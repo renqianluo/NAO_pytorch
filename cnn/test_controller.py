@@ -111,7 +111,7 @@ def nao_infer(queue, model, step):
 def main():
     arch_pool = utils.generate_arch(args.controller_seed_arch, 5, 5)
     encoder_input = list(map(lambda x: utils.parse_arch_to_seq(x[0], 2) + utils.parse_arch_to_seq(x[1], 2), arch_pool))
-    encoder_target = [np.random.random() for i in range(args.seed_arch)]
+    encoder_target = [np.random.random() for i in range(args.controller_seed_arch)]
     nao = NAO(
         args.controller_encoder_layers,
         args.controller_encoder_vocab_size,
