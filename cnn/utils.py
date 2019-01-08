@@ -106,9 +106,21 @@ class NAODataset(torch.utils.data.Dataset):
                             encoder_input[20 + 4 * b + 2:20 + 4 * b + 4] + encoder_input[20 + 4 * b:20 + 4 * b + 2] + \
                             encoder_input[20 + 4 * (b + 1):]
         if self.train:
-            return torch.LongTensor(encoder_input), torch.FloatTensor(encoder_target)
+            decoder_input = [self.sos_id] + encoder_input
+            sample = {
+                'encoder_input': torch.LongTensor(encoder_input),
+                'encoder_target': torch.FloatTensor(encoder_target),
+                'decoder_input': torch.LongTensor(decoder_input),
+                'decoder_target': torch.LongTensor(encoder_input),
+            }
         else:
-            return torch.LongTensor(encoder_input)
+            sample = {
+                'encoder_input': torch.LongTensor(encoder_input),
+                'decoder_target': torch.LongTensor(encoder_input),
+            }
+            if encoder_target is not None:
+                sample['encoder_target'] = torch.FloatTensor(encoder_target)
+        return sample
     
     def __len__(self):
         return len(self.inputs)

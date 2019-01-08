@@ -60,13 +60,17 @@ def nao_train(train_queue, model, optimizer):
     mse = utils.AvgrageMeter()
     nll = utils.AvgrageMeter()
     model.train()
-    for step, (encoder_input, encoder_target) in enumerate(train_queue):
+    for step, sample in enumerate(train_queue):
+        encoder_input = sample['encoder_input']
+        encoder_target = sample['encoder_target']
+        decoder_input = sample['decoder_input']
+        decoder_target = sample['decoder_target']
         n = encoder_input.size(0)
-        decoder_input = torch.cat([torch.LongTensor([[0] for i in range(n)]), encoder_input[:, :-1]], dim=1)
-        decoder_input = Variable(decoder_input).cuda()
-        decoder_target = Variable(encoder_input).cuda(async=True)
+        #decoder_input = torch.cat([torch.LongTensor([[0] for i in range(n)]), encoder_input[:, :-1]], dim=1)
         encoder_input = Variable(encoder_input).cuda()
         encoder_target = Variable(encoder_target).cuda(async=True)
+        decoder_input = Variable(decoder_input).cuda()
+        decoder_target = Variable(decoder_target).cuda(async=True)
         
         optimizer.zero_grad()
         predict_value, log_prob, arch = model(encoder_input, decoder_input)

@@ -171,8 +171,8 @@ def nao_valid(queue, model):
         decoder_target = Variable(decoder_target, volatile=True).cuda(async=True)
         predict_value, logits, arch = model(encoder_input)
         n = encoder_input.size(0)
-        pairwise_acc = utils.pairwise_accuracy(encoder_target.data[0].squeeze().tolist(), predict_value.data[0].squeeze().tolist())
-        hamming_dis = utils.hamming_distance(decoder_target.data[0].squeeze().tolist(), arch.data[0].squeeze().tolist())
+        pairwise_acc = utils.pairwise_accuracy(encoder_target.data.squeeze().tolist(), predict_value.data.squeeze().tolist())
+        hamming_dis = utils.hamming_distance(decoder_target.data.squeeze().tolist(), arch.data.squeeze().tolist())
         pa.update(pairwise_acc, n)
         hs.update(hamming_dis, n)
     return pa.avg, hs.avg
