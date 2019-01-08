@@ -60,10 +60,10 @@ def nao_train(train_queue, model, optimizer):
     for step, (encoder_input, encoder_target) in enumerate(train_queue):
         n = encoder_input.size(0)
         decoder_input = torch.cat([torch.LongTensor([[0] for i in range(n)]), encoder_input[:, :-1]], dim=1)
-        encoder_input = Variable(encoder_input).cuda()
-        encoder_target = Variable(encoder_target).cuda(async=True)
         decoder_input = Variable(decoder_input).cuda()
         decoder_target = Variable(encoder_input).cuda(async=True)
+        encoder_input = Variable(encoder_input).cuda()
+        encoder_target = Variable(encoder_target).cuda(async=True)
         
         optimizer.zero_grad()
         predict_value, log_prob, arch = model(encoder_input, decoder_input)
@@ -87,9 +87,10 @@ def nao_valid(queue, model):
     hs = utils.AvgrageMeter()
     model.eval()
     for step, (encoder_input, encoder_target) in enumerate(queue):
+        decoder_target = Variable(encoder_input, volatile=True).cuda(async=True)
         encoder_input = Variable(encoder_input, volatile=True).cuda()
         encoder_target = Variable(encoder_target, volatile=True).cuda(async=True)
-        decoder_target = Variable(encoder_input, volatile=True).cuda(async=True)
+        
         predict_value, logits, arch = model(encoder_input)
         n = encoder_input.size(0)
         pairwise_acc = utils.pairwise_accuracy(encoder_target.data[0].squeeze().tolist(),
