@@ -128,7 +128,7 @@ def child_valid(valid_queue, model, arch_pool, criterion):
         valid_acc_list.append(prec1)
         
         if (i+1) % 100 == 0:
-            logging.info('Valid arch %e\n loss %.2f top1 %f top5 %f', arch, loss, prec1, prec5)
+            logging.info('Valid arch %e\n loss %.2f top1 %f top5 %f', ' '.join(map(str, arch[0] + arch[1])), loss, prec1, prec5)
         
     return valid_acc_list
 
