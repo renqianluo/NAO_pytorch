@@ -224,8 +224,10 @@ def main():
             else:
                 model_clone = model.new()
             model_clone = model_clone.cuda()
+            model_clone.load_state_dict(model.state_dict())
             optimizer_clone = torch.optim.SGD(model_clone.parameters(), args.lr_max,
                                               momentum=0.9, weight_decay=args.l2_reg)
+            optimizer_clone.load_state_dict(optimizer.state_dict())
             scheduler_clone = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer_clone, float(args.epochs),
                                                                          args.lr_min, epoch - 1)
             scheduler_clone.step()
