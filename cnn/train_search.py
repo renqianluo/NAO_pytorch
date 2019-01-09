@@ -379,7 +379,7 @@ def main():
         new_archs = list(map(lambda x: utils.parse_seq_to_arch(x, 2), new_archs))  # [[[conv],[reduc]]]
         num_new_archs = len(new_archs)
         logging.info("Generate %d new archs", num_new_archs)
-        if args.replace:
+        if args.controller_replace:
             new_arch_pool = old_archs[:len(old_archs) - (num_new_archs + args.controller_random_arch)] + \
                             new_archs + utils.generate_arch(args.controller_random_arch, 5, 5)
         else:

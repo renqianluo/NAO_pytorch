@@ -304,11 +304,14 @@ def main():
         valid_accuracy_list = []
         for arch in top_archs:
             model_clone = model.new()
+            if torch.cuda.device_count() > 1:
+                model_clone = nn.DataParallel(model_clone)
+            model_clone = model_clone.cuda()
             optimizer_clone = torch.optim.SGD(model_clone.parameters(), args.child_lr_max,
                                               momentum=0.9, weight_decay=args.child_l2_reg)
             scheduler_clone = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer_clone, float(args.child_epochs),
                                                                          args.child_lr_min, epoch-1)
-            scheduler.step()
+            scheduler_clone.step()
             train_acc, train_obj, step = child_train(train_queue, model_clone, optimizer_clone, step, [arch], None, criterion)
             logging.info('train_acc %f', train_acc)
             valid_acc = child_valid(valid_queue, model_clone, [arch], criterion)[0]

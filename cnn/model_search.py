@@ -201,7 +201,7 @@ class NASNetwork(nn.Module):
     def new(self):
         model_new = NASNetwork(
             self.layers, self.nodes, self.channels, self.keep_prob, self.drop_path_keep_prob,
-            self.use_aux_head, self.steps).cuda()
+            self.use_aux_head, self.steps)
         for x, y in zip(model_new.parameters(), self.parameters()):
             x.data.copy_(y.data)
         return model_new
