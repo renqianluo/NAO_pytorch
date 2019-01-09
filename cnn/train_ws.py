@@ -165,6 +165,7 @@ def main():
     
     step = 0
     while epoch < args.epochs:
+        epoch += 1
         scheduler.step()
         lr = scheduler.get_lr()[0]
         logging.info('epoch %d lr %e', epoch, lr)
@@ -174,7 +175,7 @@ def main():
     
         # Evaluate seed archs
         valid_accuracy_list = valid(valid_queue, model, args.arch_pool, criterion)
-        epoch += 1
+
         # Output archs and evaluated error rate
         with open(os.path.join(args.output_dir, 'arch_pool.{}.perf'.format(epoch)), 'w') as f:
             for arch, perf in zip(args.arch_pool, valid_accuracy_list):

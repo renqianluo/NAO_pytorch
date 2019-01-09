@@ -272,6 +272,7 @@ def main():
         else:
             raise ValueError('Child model arch pool sample policy is not provided!')
 
+    eval_points = utils.generate_eval_points(args.eval_epochs, args.stand_alone_epochs, args.epochs)
     step = 0
     for epoch in range(1, args.child_epochs + 1):
         scheduler.step()
@@ -281,13 +282,8 @@ def main():
         train_acc, train_obj, step = child_train(train_queue, model, optimizer, step, child_arch_pool, child_arch_pool_prob, criterion)
         logging.info('train_acc %f', train_acc)
     
-        if isinstance(args.child_epochs, int):
-            if epoch % args.child_eval_epochs != 0:
-                continue
-        else:
-            assert isinstance(args.child_eval_epochs, list)
-            if epoch not in args.child_eval_epochs:
-                continue
+        if epoch not in eval_points:
+            continue
         # Evaluate seed archs
         valid_accuracy_list = child_valid(valid_queue, model, child_arch_pool, criterion)
 
