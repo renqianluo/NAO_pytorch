@@ -156,7 +156,7 @@ class NASNetwork(nn.Module):
         self.steps = steps
 
         self.pool_layers = [self.layers, 2 * self.layers + 1]
-        self.layers = self.layers * 3
+        self.total_layers = self.layers * 3 + 2
        
         if self.use_aux_head:
             self.aux_head_index = self.pool_layers[-1] #+ 1
@@ -170,16 +170,16 @@ class NASNetwork(nn.Module):
         channels = self.channels
         self.cells = nn.ModuleList()
         self.fac_recs = nn.ModuleList()
-        for i in range(self.layers+2):
+        for i in range(self.total_layers):
             if i not in self.pool_layers:
-                cell = Cell(outs, self.nodes, channels, False, i, self.layers+2, self.steps, self.drop_path_keep_prob)
+                cell = Cell(outs, self.nodes, channels, False, i, self.total_layers, self.steps, self.drop_path_keep_prob)
                 outs = [outs[-1], cell.out_shape]
             else:
                 channels *= 2
                 fac_rec = FactorizedReduce(outs[-1][-1], channels, affine=False)
                 self.fac_recs.append(fac_rec)
                 outs = [outs[-1], [outs[-1][0]//2, outs[-1][1]//2, channels]]
-                cell = Cell(outs, self.nodes, channels, True, i, self.layers+2, self.steps, self.drop_path_keep_prob)
+                cell = Cell(outs, self.nodes, channels, True, i, self.total_layers, self.steps, self.drop_path_keep_prob)
                 outs = [outs[-1], cell.out_shape]
             self.cells.append(cell)
             
