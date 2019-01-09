@@ -193,7 +193,7 @@ def main():
     
     scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, float(args.epochs), args.lr_min, epoch-1)
     
-    eval_points = utils.generate_eval_points(args.eval_epochs, args.stand_alone_epoch, args.epochs)
+    eval_points = utils.generate_eval_points(args.eval_epochs, args.stand_alone_epochs, args.epochs)
     step = 0
     while epoch < args.epochs:
         scheduler.step()
