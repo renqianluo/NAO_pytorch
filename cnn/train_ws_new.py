@@ -159,7 +159,7 @@ def main():
             archs = list(map(utils.build_dag, archs))
             arch_pool = archs
     
-    args.eval_every_epochs = eval(args.eval_every_epochs)
+    args.eval_epochs = eval(args.eval_epochs)
     train_transform, valid_transform = utils._data_transforms_cifar10(args.cutout_size)
     train_data = dset.CIFAR10(root=args.data_path, train=True, download=True, transform=train_transform)
     valid_data = dset.CIFAR10(root=args.data_path, train=False, download=True, transform=valid_transform)
