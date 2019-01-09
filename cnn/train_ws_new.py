@@ -217,10 +217,12 @@ def main():
         for index in top_arch_indices:
             arch = arch_pool[index]
             logging.info('Stand alone training arch %s', ' '.join(map(str, arch[0]+arch[1])))
-            model_clone = model.new()
             step_clone = step
             if torch.cuda.device_count() > 1:
+                model_clone = model.module.new()
                 model_clone = nn.DataParallel(model_clone)
+            else:
+                model_clone = model.new()
             model_clone = model_clone.cuda()
             optimizer_clone = torch.optim.SGD(model_clone.parameters(), args.lr_max,
                                               momentum=0.9, weight_decay=args.l2_reg)
