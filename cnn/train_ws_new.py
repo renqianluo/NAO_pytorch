@@ -28,6 +28,7 @@ parser.add_argument('--top_to_train', type=int, default=20)
 parser.add_argument('--batch_size', type=int, default=128)
 parser.add_argument('--eval_batch_size', type=int, default=500)
 parser.add_argument('--epochs', type=int, default=100)
+parser.add_argument('--stand_alone_epochs', type=int, default=1)
 parser.add_argument('--layers', type=int, default=2)
 parser.add_argument('--nodes', type=int, default=5)
 parser.add_argument('--channels', type=int, default=20)
@@ -202,7 +203,7 @@ def main():
         logging.info('train_acc %f', train_acc)
 
         if isinstance(args.eval_epochs, int):
-            if epoch % args.eval_epochs != 0:
+            if epoch % (args.eval_epochs - args.stand_alone_epochs) != 0:
                 continue
         else:
             assert isinstance(args.eval_epochs, list)
@@ -219,7 +220,9 @@ def main():
         
         for index in top_arch_indices:
             arch = arch_pool[index]
+            logging.info('Stand alone training arch %s', ' '.join(map(str, arch[0]+arch[1])))
             model_clone = model.new()
+            step_clone = step
             if torch.cuda.device_count() > 1:
                 model_clone = nn.DataParallel(model_clone)
             model_clone = model_clone.cuda()
@@ -228,12 +231,15 @@ def main():
             scheduler_clone = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer_clone, float(args.epochs),
                                                                          args.lr_min, epoch - 1)
             scheduler_clone.step()
-            train_acc, train_obj, step = train(train_queue, model_clone, optimizer_clone, step, [arch], criterion)
-            logging.info('train_acc %f', train_acc)
-            valid_acc = valid(valid_queue, model_clone, [arch], criterion)[0]
+            for i in range(args.stand_alone_epochs):
+                train_acc, train_obj, step_clone = train(train_queue, model_clone, optimizer_clone, step_clone, [arch], criterion)
+                logging.info('train %03d train_acc %f', i, train_acc)
+            valid_acc = random_valid(valid_queue, model_clone, [arch], criterion)[0]
             valid_accuracy_list[index] = valid_acc
             for prm, prm_clone in zip(model.parameters(), model_clone.parameters()):
                 prm.data = prm.data + prm_clone.data
+                
+        
         # Merge models
         for prm in model_clone.parameters():
             prm.data = prm.data / (args.top_to_train + 1)
@@ -246,8 +252,12 @@ def main():
         for i, e in enumerate(rest_valid_accuracy_list):
             index = rest_arch_indices[i]
             valid_accuracy_list[index] = e
+            
+        # Update epoch and scheduler
+        for i in range(args.stand_alone_epochs):
+            epoch += 1
+            scheduler.step()
         
-        epoch += 1
         # Output archs and evaluated error rate
         with open(os.path.join(args.output_dir, 'arch_pool.{}.perf'.format(epoch)), 'w') as f:
             for arch, perf in zip(arch_pool, valid_accuracy_list):
