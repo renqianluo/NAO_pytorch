@@ -194,7 +194,8 @@ def main():
     
     eval_points = utils.generate_eval_points(args.eval_epochs, args.stand_alone_epochs, args.epochs)
     step = 0
-    while epoch < args.epochs:
+    while epoch <= args.epochs:
+        epoch += 1
         scheduler.step()
         lr = scheduler.get_lr()[0]
         logging.info('epoch %d lr %e', epoch, lr)
@@ -248,18 +249,18 @@ def main():
             index = rest_arch_indices[i]
             valid_accuracy_list[index] = e
             
-        # Update epoch and scheduler
-        for i in range(args.stand_alone_epochs):
-            epoch += 1
-            scheduler.step()
-        
         # Output archs and evaluated error rate
         with open(os.path.join(args.output_dir, 'arch_pool.{}.perf'.format(epoch)), 'w') as f:
             for arch, perf in zip(arch_pool, valid_accuracy_list):
                 arch = ' '.join(map(str, arch[0] + arch[1]))
                 f.write('arch: {}\tvalid acc: {}\n'.format(arch, perf))
         utils.save(args.output_dir, args, model, epoch, step, optimizer)
-      
+
+        # Update epoch and scheduler
+        for i in range(args.stand_alone_epochs):
+            epoch += 1
+            scheduler.step()
+
 
 if __name__ == '__main__':
     main()
