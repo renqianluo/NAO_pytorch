@@ -197,6 +197,14 @@ class NASNetwork(nn.Module):
         for w in self.parameters():
             if w.data.dim() >= 2:
                 nn.init.kaiming_normal(w.data)
+
+    def new(self):
+        model_new = NASNetwork(
+            self.layers, self.nodes, self.channels, self.keep_prob, self.drop_path_keep_prob,
+            self.use_aux_head, self.steps).cuda()
+        for x, y in zip(model_new.parameters(), self.parameters()):
+            x.data.copy_(y.data)
+        return model_new
     
     def forward(self, input, arch, step=None):
         aux_logits = None

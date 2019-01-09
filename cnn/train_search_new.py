@@ -193,7 +193,6 @@ def nao_infer(queue, model, step):
     model.eval()
     for i, sample in enumerate(queue):
         encoder_input = sample['encoder_input']
-        encoder_input = Variable(encoder_input).cuda()
         model.zero_grad()
         new_arch = model.generate_new_arch(encoder_input, step)
         new_arch_list.extend(new_arch.data.squeeze().tolist())
@@ -299,6 +298,29 @@ def main():
         old_archs_sorted_indices = np.argsort(old_archs_perf)
         old_archs = np.array(old_archs)[old_archs_sorted_indices].tolist()
         old_archs_perf = np.array(old_archs_perf)[old_archs_sorted_indices].tolist()
+        
+        
+        top_archs = old_archs[:10]
+        valid_accuracy_list = []
+        for arch in top_archs:
+            model_clone = model.new()
+            optimizer_clone = torch.optim.SGD(model_clone.parameters(), args.child_lr_max,
+                                              momentum=0.9, weight_decay=args.child_l2_reg)
+            scheduler_clone = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer_clone, float(args.child_epochs),
+                                                                         args.child_lr_min, epoch-1)
+            scheduler.step()
+            train_acc, train_obj, step = child_train(train_queue, model_clone, optimizer_clone, step, [arch], None, criterion)
+            logging.info('train_acc %f', train_acc)
+            valid_acc = child_valid(valid_queue, model_clone, [arch], criterion)[0]
+            valid_accuracy_list.append(valid_acc)
+            for prm, prm_clone in zip(model.parameters(), model_clone.parameters()):
+                prm.data.copy_(prm_clone.data)
+        # Merge models
+        for prm in model_clone.parameters():
+            prm.data = prm.data / (len(top_archs) + 1)
+        valid_accuracy_list += child_valid(valid_queue, model_clone, old_archs[10:], criterion)
+        
+        
         with open(os.path.join(args.output_dir, 'arch_pool.{}'.format(epoch)), 'w') as fa:
             with open(os.path.join(args.output_dir, 'arch_pool.perf.{}'.format(epoch)), 'w') as fp:
                 with open(os.path.join(args.output_dir, 'arch_pool'), 'w') as fa_latest:
