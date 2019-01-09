@@ -322,3 +322,15 @@ def hamming_distance(la, lb):
         line2 = lb[i]
         dis += _hamming_distance(line1, line2)
     return dis / N
+
+
+def generate_eval_points(eval_epochs, stand_alone_epoch, total_epochs):
+    if isinstance(eval_epochs, list):
+        return eval_epochs
+    assert isinstance(eval_epochs, int)
+    res = []
+    eval_point = eval_epochs - stand_alone_epoch
+    while eval_point + stand_alone_epoch < total_epochs:
+        res.append(eval_point)
+        eval_point += eval_epochs
+    return res

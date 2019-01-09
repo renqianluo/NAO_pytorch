@@ -119,7 +119,7 @@ def random_valid(valid_queue, model, arch_pool, criterion):
         top1 = utils.AvgrageMeter()
         top5 = utils.AvgrageMeter()
         model.eval()
-        input, target = next(iter(valid_queue)):
+        input, target = next(iter(valid_queue))
         input = Variable(input, volatile=True).cuda()
         target = Variable(target, volatile=True).cuda(async=True)
         
@@ -193,6 +193,7 @@ def main():
     
     scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, float(args.epochs), args.lr_min, epoch-1)
     
+    eval_points = utils.generate_eval_points(args.eval_epochs, args.stand_alone_epoch, args.epochs)
     step = 0
     while epoch < args.epochs:
         scheduler.step()
@@ -202,13 +203,8 @@ def main():
         train_acc, train_obj, step = train(train_queue, model, optimizer, step, arch_pool, criterion)
         logging.info('train_acc %f', train_acc)
 
-        if isinstance(args.eval_epochs, int):
-            if epoch % (args.eval_epochs - args.stand_alone_epochs) != 0:
-                continue
-        else:
-            assert isinstance(args.eval_epochs, list)
-            if epoch not in args.eval_epochs:
-                continue
+        if epoch not in eval_points:
+            continue
         # Evaluate seed archs
         valid_accuracy_list = random_valid(valid_queue, model, arch_pool, criterion)
         valid_err_list = [1 - i for i in valid_accuracy_list]
