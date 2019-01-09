@@ -102,10 +102,11 @@ class Decoder(nn.Module):
         def decode(step, step_output, step_attn):
             decoder_outputs.append(step_output)
             ret_dict[Decoder.KEY_ATTN_SCORE].append(step_attn)
-            if step % 2 == 0:  # sample index, should be in [1, step+1]
-                symbols = decoder_outputs[-1][:, 1:step // 2 + 2].topk(1)[1] + 1
-            else:  # sample operation, should be in [8, 12]
-                symbols = decoder_outputs[-1][:, 8:].topk(1)[1] + 8
+            if step % 2 == 0:  # sample index, should be in [1, index-1]
+                index = step // 2 % 10 // 2 + 3
+                symbols = decoder_outputs[-1][:, 1:index].topk(1)[1] + 1
+            else:  # sample operation, should be in [7, 11]
+                symbols = decoder_outputs[-1][:, 7:].topk(1)[1] + 7
             
             sequence_symbols.append(symbols)
             
