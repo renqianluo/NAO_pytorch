@@ -282,7 +282,7 @@ def main():
         train_acc, train_obj, step = child_train(train_queue, model, optimizer, step, child_arch_pool, child_arch_pool_prob, criterion)
         logging.info('train_acc %f', train_acc)
     
-        if isinstance(args.child_epochs, int):
+        if isinstance(args.child_eval_epochs, int):
             if epoch % args.child_eval_epochs != 0:
                 continue
         else:

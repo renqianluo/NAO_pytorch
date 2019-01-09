@@ -299,7 +299,6 @@ def main():
         old_archs = np.array(old_archs)[old_archs_sorted_indices].tolist()
         old_archs_perf = np.array(old_archs_perf)[old_archs_sorted_indices].tolist()
         
-        
         top_archs = old_archs[:10]
         valid_accuracy_list = []
         for arch in top_archs:
@@ -322,7 +321,6 @@ def main():
         for prm in model_clone.parameters():
             prm.data = prm.data / (len(top_archs) + 1)
         valid_accuracy_list += child_valid(valid_queue, model_clone, old_archs[10:], criterion)
-        
         
         with open(os.path.join(args.output_dir, 'arch_pool.{}'.format(epoch)), 'w') as fa:
             with open(os.path.join(args.output_dir, 'arch_pool.perf.{}'.format(epoch)), 'w') as fp:
