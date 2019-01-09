@@ -273,7 +273,7 @@ def main():
         else:
             raise ValueError('Child model arch pool sample policy is not provided!')
 
-    eval_points = utils.generate_eval_points(args.child_eval_epochs, 0, args.epochs)
+    eval_points = utils.generate_eval_points(args.child_eval_epochs, 0, args.child_epochs)
     step = 0
     for epoch in range(1, args.child_epochs + 1):
         scheduler.step()
