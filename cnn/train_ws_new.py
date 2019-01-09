@@ -173,7 +173,6 @@ def main():
     criterion = nn.CrossEntropyLoss()
     if torch.cuda.device_count() > 1:
         model = nn.DataParallel(model)
-        criterion = nn.DataParallel(criterion)
     model = model.cuda()
     criterion = criterion.cuda()
     logging.info("param size = %fMB", utils.count_parameters_in_MB(model))
