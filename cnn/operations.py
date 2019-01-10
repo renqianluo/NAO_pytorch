@@ -65,10 +65,8 @@ class WSConv(nn.Module):
         self.w = nn.ParameterList([nn.Parameter(torch.Tensor(C_out, C_in, kernel_size, kernel_size)) for _ in range(num_possible_inputs)])
     
     def forward(self, x, x_id):
-        x = self.relu(x)
         w = torch.cat([self.w[i] for i in x_id], dim=1)
         x = F.conv2d(x, w, stride=self.stride, padding=self.padding)
-        x = self.bn(x, x_id)
         return x
 
 
