@@ -59,27 +59,16 @@ class ReLUConvBN(nn.Module):
         return self.op(x)
 
 
-class WSReLUConvBN(nn.Module):
-    def __init__(self, num_possible_inputs, C_in, C_out, kernel_size, stride, padding, affine=True):
-        super(WSReLUConvBN, self).__init__()
-        self.C_in = C_in
-        self.C_out = C_out
-        self.kernel_size = kernel_size
-        self.stride = stride
-        self.padding = padding
-        self.w = nn.ParameterList([nn.Parameter(torch.Tensor(C_out, C_in, kernel_size, kernel_size)) for i in range(num_possible_inputs)])
-        self.relu = nn.ReLU(inplace=False)
-        self.bn = WSBN(num_possible_inputs, C_out, affine=affine)
+class WSConv(nn.Module):
+    def __init__(self, num_possible_inputs, C_out, C_in, kernel_size):
+        super(WSConv, self).__init__()
+        self.w = nn.ParameterList([nn.Parameter(torch.Tensor(C_out, C_in, kernel_size, kernel_size)) for _ in range(num_possible_inputs)])
     
     def forward(self, x, x_id):
         x = self.relu(x)
-        if isinstance(x_id, int):
-            w = self.w[x_id]
-        else:
-            assert isinstance(x_id, list)
-            w = torch.cat([self.w[i] for i in x_id], dim=1)
+        w = torch.cat([self.w[i] for i in x_id], dim=1)
         x = F.conv2d(x, w, stride=self.stride, padding=self.padding)
-        x = self.bn(x)
+        x = self.bn(x, x_id)
         return x
 
 
@@ -93,8 +82,8 @@ class WSBN(nn.Module):
         self.momentum = momentum
         self.affine = affine
         if self.affine:
-            self.weight = nn.ParameterList([nn.Parameter(torch.Tensor(num_features)) for i in range(num_possible_inputs)])
-            self.bias = nn.ParameterList([nn.Parameter(torch.Tensor(num_features)) for i in range(num_possible_inputs)])
+            self.weight = nn.ParameterList([nn.Parameter(torch.Tensor(num_features)) for _ in range(num_possible_inputs)])
+            self.bias = nn.ParameterList([nn.Parameter(torch.Tensor(num_features)) for _ in range(num_possible_inputs)])
         else:
             self.register_parameter('weight', None)
             self.register_parameter('bias', None)
@@ -117,11 +106,9 @@ class WSBN(nn.Module):
 
     def __repr__(self):
         return ('{name}({num_features}, eps={eps}, momentum={momentum},'
-                ' affine={affine})'
-                .format(name=self.__class__.__name__, **self.__dict__))
+                ' affine={affine})'.format(name=self.__class__.__name__, **self.__dict__))
     
     
-
 class SepConv(nn.Module):
     def __init__(self, C_in, C_out, kernel_size, stride, padding, affine=True):
         super(SepConv, self).__init__()
@@ -152,23 +139,23 @@ class WSSepConv(nn.Module):
         self.relu1 = nn.ReLU(inplace=False)
         self.W1_depthwise = nn.ParameterList([nn.Parameter(torch.Tensor(C_in, 1, kernel_size, kernel_size)) for i in range(num_possible_inputs)])
         self.W1_pointwise = nn.ParameterList([nn.Parameter(torch.Tensor(C_out, C_in, 1, 1)) for i in range(num_possible_inputs)])
-        self.bn1 = nn.BatchNorm2d(C_in, affine=affine)
+        self.bn1 = WSBN(num_possible_inputs, C_in, affine=affine)
 
         self.relu2 = nn.ReLU(inplace=False)
         self.W2_depthwise = nn.ParameterList([nn.Parameter(torch.Tensor(C_in, 1, kernel_size, kernel_size)) for i in range(num_possible_inputs)])
         self.W2_pointwise = nn.ParameterList([nn.Parameter(torch.Tensor(C_out, C_in, 1, 1)) for i in range(num_possible_inputs)])
-        self.bn2 = nn.BatchNorm2d(C_in, affine=affine)
+        self.bn2 = WSBN(num_possible_inputs, C_in, affine=affine)
     
     def forward(self, x, x_id):
         x = self.relu1(x)
         x = F.conv2d(x, self.W1_depthwise[x_id], stride=self.stride, padding=self.padding, groups=self.C_in)
         x = F.conv2d(x, self.W1_pointwise[x_id], padding=0)
-        x = self.bn1(x)
+        x = self.bn1(x, x_id)
 
         x = self.relu2(x)
         x = F.conv2d(x, self.W2_depthwise[x_id], padding=self.padding, groups=self.C_in)
         x = F.conv2d(x, self.W2_pointwise[x_id], padding=0)
-        x = self.bn2(x)
+        x = self.bn2(x, x_id)
         return x
 
 

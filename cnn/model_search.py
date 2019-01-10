@@ -114,7 +114,7 @@ class Cell(nn.Module):
             prev_layers.append(node.out_shape)
         out_hw = min([shape[0] for i, shape in enumerate(prev_layers)])
         
-        self.final_combine_conv = WSReLUConvBN(self.nodes+2, channels, channels, 1, 1, 0, False)
+        self.final_combine_conv = WSConv(self.nodes+2, channels, channels, 1)
         
         self.out_shape = [out_hw, out_hw, channels]
         
