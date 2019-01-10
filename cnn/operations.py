@@ -60,8 +60,10 @@ class ReLUConvBN(nn.Module):
 
 
 class WSConv(nn.Module):
-    def __init__(self, num_possible_inputs, C_out, C_in, kernel_size):
+    def __init__(self, num_possible_inputs, C_out, C_in, kernel_size, stride=1, padding=0):
         super(WSConv, self).__init__()
+        self.stride = stride
+        self.padding = padding
         self.w = nn.ParameterList([nn.Parameter(torch.Tensor(C_out, C_in, kernel_size, kernel_size)) for _ in range(num_possible_inputs)])
     
     def forward(self, x, x_id):
