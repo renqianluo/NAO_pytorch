@@ -1,14 +1,8 @@
-import os
-import sys
-import time
-import numpy as np
 import logging
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from operations import *
-from torch.autograd import Variable
-import utils
 
 
 class Node(nn.Module):
@@ -176,7 +170,7 @@ class NASNetwork(nn.Module):
                 outs = [outs[-1], cell.out_shape]
             else:
                 channels *= 2
-                fac_rec = FactorizedReduce(outs[-1][-1], channels, affine=False)
+                fac_rec = FactorizedReduce(outs[-1][-1], channels)
                 self.fac_recs.append(fac_rec)
                 outs = [outs[-1], [outs[-1][0]//2, outs[-1][1]//2, channels]]
                 cell = Cell(outs, self.nodes, channels, True, i, self.total_layers, self.steps, self.drop_path_keep_prob)
@@ -228,37 +222,3 @@ class NASNetwork(nn.Module):
     
     def loss(self, logits, target):
         return self.criterion(logits, target)
-    
-    
-def train(train_queue, model):
-    objs = utils.AvgrageMeter()
-    top1 = utils.AvgrageMeter()
-    top5 = utils.AvgrageMeter()
-    for step, (input, target) in enumerate(train_queue):
-        model.train()
-        n = input.size(0)
-        input = Variable(input, requires_grad=False).cuda()
-        target = Variable(target, requires_grad=False).cuda(async=True)
-        model.optimizer.zero_grad()
-        logits, aux_logits = model(input)
-        loss = model.criterion(logits, target) + 0.4 * model.criterion(aux_logits, target)
-        nn.utils.clip_grad_norm(model.parameters(), model.grad_clip)
-        model.optimizer.step()
-        prec1, prec5 = utils.accuracy(logits,target, topk=(1,5))
-        objs.update(loss.data[0], n)
-        top1.update(prec1.data[0], n)
-        top5.update(prec5.data[0], n)
-  
-        if step % 100 == 0 :
-            logging.info('train %03d %e %f %f', step, objs.avg, top1.avg, top5.avg)
-
-def valid(valid_queue, model, arch_pool):
-    model.eval()
-    arch_pool_valid_acc = []
-    for arch in arch_pool:
-        input, target = next(iter(valid_queue))
-        input = Variable(input, volatile=True).cuda()
-        logits, _ = model(input, arch)
-        prec1, prec5 = utils.accuracy(logits, target, topk=(1, 5))
-        arch_pool_valid_acc.append(prec1)
-    return arch_pool_valid_acc

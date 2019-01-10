@@ -12,6 +12,7 @@ OPERATIONS = {
     4: lambda C, stride, affine: Identity(), # identity
 }
 
+
 def apply_drop_path(x, drop_path_keep_prob, layer_id, layers, step, steps):
     layer_ratio = float(layer_id+1) / (layers)
     drop_path_keep_prob = 1.0 - layer_ratio * (1.0 - drop_path_keep_prob)
@@ -68,7 +69,7 @@ class WSReLUConvBN(nn.Module):
         self.padding = padding
         self.w = nn.ParameterList([nn.Parameter(torch.Tensor(C_out, C_in, kernel_size, kernel_size)) for i in range(num_possible_inputs)])
         self.relu = nn.ReLU(inplace=False)
-        self.bn = nn.BatchNorm2d(C_out, affine=affine)
+        self.bn = WSBN(num_possible_inputs, C_out, affine=affine)
     
     def forward(self, x, x_id):
         x = self.relu(x)
@@ -81,6 +82,45 @@ class WSReLUConvBN(nn.Module):
         x = self.bn(x)
         return x
 
+
+class WSBN(nn.Module):
+
+    def __init__(self, num_possible_inputs, num_features, eps=1e-5, momentum=0.1, affine=True):
+        super(WSBN, self).__init__()
+        self.num_possible_inputs = num_possible_inputs
+        self.num_features = num_features
+        self.eps = eps
+        self.momentum = momentum
+        self.affine = affine
+        if self.affine:
+            self.weight = nn.ParameterList([nn.Parameter(torch.Tensor(num_features)) for i in range(num_possible_inputs)])
+            self.bias = nn.ParameterList([nn.Parameter(torch.Tensor(num_features)) for i in range(num_possible_inputs)])
+        else:
+            self.register_parameter('weight', None)
+            self.register_parameter('bias', None)
+        self.register_buffer('running_mean', torch.zeros(num_features))
+        self.register_buffer('running_var', torch.ones(num_features))
+        self.reset_parameters()
+
+    def reset_parameters(self):
+        self.running_mean.zero_()
+        self.running_var.fill_(1)
+        if self.affine:
+            for i in range(self.num_possible_inputs):
+                self.weight[i].data.uniform_()
+                self.bias[i].data.zero_()
+
+    def forward(self, x, x_id):
+        return F.batch_norm(
+            x, self.running_mean, self.running_var, self.weight[x_id], self.bias[x_id],
+            self.training, self.momentum, self.eps)
+
+    def __repr__(self):
+        return ('{name}({num_features}, eps={eps}, momentum={momentum},'
+                ' affine={affine})'
+                .format(name=self.__class__.__name__, **self.__dict__))
+    
+    
 
 class SepConv(nn.Module):
     def __init__(self, C_in, C_out, kernel_size, stride, padding, affine=True):

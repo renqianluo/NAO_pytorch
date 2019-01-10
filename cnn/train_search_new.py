@@ -314,9 +314,9 @@ def main():
             for prm, prm_clone in zip(model.parameters(), model_clone.parameters()):
                 prm.data.copy_(prm_clone.data)
         # Merge models
-        for prm in model_clone.parameters():
+        for prm in model.parameters():
             prm.data = prm.data / (len(top_archs) + 1)
-        valid_accuracy_list += child_valid(valid_queue, model_clone, old_archs[10:], criterion)
+        valid_accuracy_list += child_valid(valid_queue, model, old_archs[10:], criterion)
         
         with open(os.path.join(args.output_dir, 'arch_pool.{}'.format(epoch)), 'w') as fa:
             with open(os.path.join(args.output_dir, 'arch_pool.perf.{}'.format(epoch)), 'w') as fp:

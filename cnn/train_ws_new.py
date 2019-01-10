@@ -194,7 +194,7 @@ def main():
     
     eval_points = utils.generate_eval_points(args.eval_epochs, args.stand_alone_epochs, args.epochs)
     step = 0
-    while epoch <= args.epochs:
+    while epoch < args.epochs:
         epoch += 1
         scheduler.step()
         lr = scheduler.get_lr()[0]
@@ -230,8 +230,8 @@ def main():
             optimizer_clone.load_state_dict(optimizer.state_dict())
             scheduler_clone = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer_clone, float(args.epochs),
                                                                          args.lr_min, epoch - 1)
-            scheduler_clone.step()
             for i in range(args.stand_alone_epochs):
+                scheduler_clone.step()
                 train_acc, train_obj, step_clone = train(train_queue, model_clone, optimizer_clone, step_clone, [arch], criterion)
                 logging.info('train %03d train_acc %f', i, train_acc)
             valid_acc = random_valid(valid_queue, model_clone, [arch], criterion)[0]
@@ -241,17 +241,22 @@ def main():
                 
         
         # Merge models
-        for prm in model_clone.parameters():
+        for prm in model.parameters():
             prm.data = prm.data / (args.top_to_train + 1)
         
         # Evaluate rest architectures
         rest_archs = []
         for index in rest_arch_indices:
             rest_archs.append(arch_pool[index])
-        rest_valid_accuracy_list = random_valid(valid_queue, model_clone, rest_archs, criterion)
+        rest_valid_accuracy_list = random_valid(valid_queue, model, rest_archs, criterion)
         for i, e in enumerate(rest_valid_accuracy_list):
             index = rest_arch_indices[i]
             valid_accuracy_list[index] = e
+
+        # Update epoch and scheduler
+        for i in range(args.stand_alone_epochs):
+            epoch += 1
+            scheduler.step()
             
         # Output archs and evaluated error rate
         with open(os.path.join(args.output_dir, 'arch_pool.{}.perf'.format(epoch)), 'w') as f:
@@ -259,11 +264,6 @@ def main():
                 arch = ' '.join(map(str, arch[0] + arch[1]))
                 f.write('arch: {}\tvalid acc: {}\n'.format(arch, perf))
         utils.save(args.output_dir, args, model, epoch, step, optimizer)
-
-        # Update epoch and scheduler
-        for i in range(args.stand_alone_epochs):
-            epoch += 1
-            scheduler.step()
 
 
 if __name__ == '__main__':

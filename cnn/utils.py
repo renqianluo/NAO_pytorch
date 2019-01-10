@@ -330,7 +330,7 @@ def generate_eval_points(eval_epochs, stand_alone_epoch, total_epochs):
     assert isinstance(eval_epochs, int)
     res = []
     eval_point = eval_epochs - stand_alone_epoch
-    while eval_point + stand_alone_epoch < total_epochs:
+    while eval_point + stand_alone_epoch <= total_epochs:
         res.append(eval_point)
         eval_point += eval_epochs
     return res

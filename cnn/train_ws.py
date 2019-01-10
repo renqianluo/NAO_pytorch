@@ -34,11 +34,11 @@ parser.add_argument('--cutout_size', type=int, default=None)
 parser.add_argument('--grad_bound', type=float, default=5.0)
 parser.add_argument('--lr_max', type=float, default=0.025)
 parser.add_argument('--lr_min', type=float, default=0.001)
-parser.add_argument('--keep_prob', type=float, default=0.5)
+parser.add_argument('--keep_prob', type=float, default=1.0)
 parser.add_argument('--drop_path_keep_prob', type=float, default=1.0)
 parser.add_argument('--l2_reg', type=float, default=3e-4)
 parser.add_argument('--use_aux_head', action='store_true', default=False)
-parser.add_argument('--eval_every_epochs', type=str, default='30')
+parser.add_argument('--eval_epochs', type=str, default='30')
 parser.add_argument('--arch_pool', type=str, default=None)
 args = parser.parse_args()
 
@@ -110,7 +110,6 @@ def valid(valid_queue, model, arch_pool, criterion):
     return valid_acc_list
 
 
-
 def main():
     if not torch.cuda.is_available():
         logging.info('no gpu device available')
@@ -131,9 +130,9 @@ def main():
         with open(args.arch_pool) as f:
             archs = f.read().splitlines()
             archs = list(map(utils.build_dag, archs))
-            args.arch_pool = archs
+            arch_pool = archs
     
-    args.eval_every_epochs = eval(args.eval_every_epochs)
+    eval_epochs = eval(args.eval_epochs)
     train_transform, valid_transform = utils._data_transforms_cifar10(args.cutout_size)
     train_data = dset.CIFAR10(root=args.data_path, train=True, download=True, transform=train_transform)
     valid_data = dset.CIFAR10(root=args.data_path, train=False, download=True, transform=valid_transform)
@@ -141,9 +140,9 @@ def main():
     valid_queue = torch.utils.data.DataLoader(valid_data, batch_size=args.eval_batch_size, pin_memory=True, num_workers=16)
   
     # Train child model
-    assert args.arch_pool is not None
+    assert arch_pool is not None
   
-    model = NASNetwork(args.layers, args.nodes, args.channels, args.keep_prob, args.drop_path_keep_prob, args.use_aux_head, args.steps, )
+    model = NASNetwork(args.layers, args.nodes, args.channels, args.keep_prob, args.drop_path_keep_prob, args.use_aux_head, args.steps)
     model = model.cuda()
     criterion = nn.CrossEntropyLoss().cuda()
     logging.info("param size = %fMB", utils.count_parameters_in_MB(model))
@@ -162,7 +161,8 @@ def main():
         optimizer.load_state_dict(optimizer_state_dict)
     
     scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, float(args.epochs), args.lr_min, epoch-1)
-    
+
+    eval_points = utils.generate_eval_points(eval_epochs, 0, args.epochs)
     step = 0
     while epoch < args.epochs:
         epoch += 1
@@ -170,15 +170,18 @@ def main():
         lr = scheduler.get_lr()[0]
         logging.info('epoch %d lr %e', epoch, lr)
         # sample an arch to train
-        train_acc, train_obj, step = train(train_queue, model, optimizer, step, args.arch_pool, criterion)
+        train_acc, train_obj, step = train(train_queue, model, optimizer, step, arch_pool, criterion)
         logging.info('train_acc %f', train_acc)
     
         # Evaluate seed archs
-        valid_accuracy_list = valid(valid_queue, model, args.arch_pool, criterion)
+        if epoch not in eval_points:
+            continue
+            
+        valid_accuracy_list = valid(valid_queue, model, arch_pool, criterion)
 
         # Output archs and evaluated error rate
         with open(os.path.join(args.output_dir, 'arch_pool.{}.perf'.format(epoch)), 'w') as f:
-            for arch, perf in zip(args.arch_pool, valid_accuracy_list):
+            for arch, perf in zip(arch_pool, valid_accuracy_list):
                 arch = ' '.join(map(str, arch[0] + arch[1]))
                 f.write('arch: {}\tvalid acc: {}\n'.format(arch, perf))
         utils.save(args.output_dir, args, model, epoch, step, optimizer)
