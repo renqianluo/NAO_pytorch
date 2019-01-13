@@ -354,7 +354,7 @@ def main():
 
         # Generate new archs
         new_archs = []
-        max_step_size = 100
+        max_step_size = 50
         predict_step_size = 0
         top100_archs = list(map(lambda x: utils.parse_arch_to_seq(x[0], 2) + utils.parse_arch_to_seq(x[1], 2), old_archs[:100]))
         nao_infer_dataset = utils.NAODataset(top100_archs, None, False)
@@ -380,11 +380,10 @@ def main():
             new_arch_pool = old_archs[:len(old_archs) - (num_new_archs + args.controller_random_arch)] + \
                             new_archs + utils.generate_arch(args.controller_random_arch, 5, 5)
         elif args.controller_discard:
-            num_old_archs = len(old_archs)
-            new_arch_pool = old_archs[:num_old_archs//2] + new_archs + utils.generate_arch(args.controller_random_arch, 5, 5)
+            new_arch_pool = old_archs[:100] + new_archs + utils.generate_arch(args.controller_random_arch, 5, 5)
         else:
             new_arch_pool = old_archs + new_archs + utils.generate_arch(args.controller_random_arch, 5, 5)
-        logging.info("Totally %d archs now to train", len(new_arch_pool))
+        logging.info("Totally %d architectures now to train", len(new_arch_pool))
         child_arch_pool = new_arch_pool
         with open(os.path.join(args.output_dir, 'arch_pool'), 'w') as f:
             for arch in new_arch_pool:
