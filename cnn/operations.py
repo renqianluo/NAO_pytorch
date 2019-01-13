@@ -64,7 +64,7 @@ class WSReLUConvBN(nn.Module):
         super(WSReLUConvBN, self).__init__()
         self.stride = stride
         self.padding = padding
-        self.relu = nn.ReLU(inplace=False),
+        self.relu = nn.ReLU(inplace=False)
         self.w = nn.ParameterList([nn.Parameter(torch.Tensor(C_out, C_in, kernel_size, kernel_size)) for _ in range(num_possible_inputs)])
         self.bn = nn.BatchNorm2d(C_out, affine=True)
     
