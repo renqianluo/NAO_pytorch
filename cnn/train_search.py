@@ -249,6 +249,25 @@ def main():
     model = model.cuda()
     criterion = nn.CrossEntropyLoss().cuda()
     logging.info("param size = %fMB", utils.count_parameters_in_MB(model))
+    nao = NAO(
+        args.controller_encoder_layers,
+        args.controller_encoder_vocab_size,
+        args.controller_encoder_hidden_size,
+        args.controller_encoder_dropout,
+        args.controller_encoder_length,
+        args.controller_source_length,
+        args.controller_encoder_emb_size,
+        args.controller_mlp_layers,
+        args.controller_mlp_hidden_size,
+        args.controller_mlp_dropout,
+        args.controller_decoder_layers,
+        args.controller_decoder_vocab_size,
+        args.controller_decoder_hidden_size,
+        args.controller_decoder_dropout,
+        args.controller_decoder_length,
+    )
+    nao = nao.cuda()
+    logging.info("param size = %fMB", utils.count_parameters_in_MB(nao))
 
     optimizer = torch.optim.SGD(
         model.parameters(),
@@ -318,25 +337,6 @@ def main():
         max_val = max(old_archs_perf)
         encoder_target = [(i - min_val) / (max_val - min_val) for i in old_archs_perf]
 
-        nao = NAO(
-            args.controller_encoder_layers,
-            args.controller_encoder_vocab_size,
-            args.controller_encoder_hidden_size,
-            args.controller_encoder_dropout,
-            args.controller_encoder_length,
-            args.controller_source_length,
-            args.controller_encoder_emb_size,
-            args.controller_mlp_layers,
-            args.controller_mlp_hidden_size,
-            args.controller_mlp_dropout,
-            args.controller_decoder_layers,
-            args.controller_decoder_vocab_size,
-            args.controller_decoder_hidden_size,
-            args.controller_decoder_dropout,
-            args.controller_decoder_length,
-        )
-        logging.info("param size = %fMB", utils.count_parameters_in_MB(nao))
-        nao = nao.cuda()
         nao_train_dataset = utils.NAODataset(encoder_input, encoder_target, True, swap=True)
         nao_valid_dataset = utils.NAODataset(encoder_input, encoder_target, False)
         nao_train_queue = torch.utils.data.DataLoader(
