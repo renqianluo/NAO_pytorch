@@ -45,6 +45,7 @@ log_format = '%(asctime)s %(message)s'
 logging.basicConfig(stream=sys.stdout, level=logging.INFO,
     format=log_format, datefmt='%m/%d %I:%M:%S %p')
 
+
 def train(train_queue, model, optimizer, global_step, criterion):
     objs = utils.AvgrageMeter()
     top1 = utils.AvgrageMeter()

@@ -59,16 +59,20 @@ class ReLUConvBN(nn.Module):
         return self.op(x)
 
 
-class WSConv(nn.Module):
+class WSReLUConvBN(nn.Module):
     def __init__(self, num_possible_inputs, C_out, C_in, kernel_size, stride=1, padding=0):
         super(WSConv, self).__init__()
         self.stride = stride
         self.padding = padding
+        self.relu = nn.ReLU(inplace=False),
         self.w = nn.ParameterList([nn.Parameter(torch.Tensor(C_out, C_in, kernel_size, kernel_size)) for _ in range(num_possible_inputs)])
+        self.bn = nn.BatchNorm2d(C_out, affine=True)
     
     def forward(self, x, x_id):
+        x = self.relu(x)
         w = torch.cat([self.w[i] for i in x_id], dim=1)
         x = F.conv2d(x, w, stride=self.stride, padding=self.padding)
+        x = self.bn(x)
         return x
 
 
@@ -192,11 +196,11 @@ class MaybeCalibrateSize(nn.Module):
         hw = [layer[0] for layer in layers]
         c = [layer[-1] for layer in layers]
         
-        x_out_shape = [hw[0], hw[1], c[0]]
+        x_out_shape = [hw[0], hw[0], c[0]]
         y_out_shape = [hw[1], hw[1], c[1]]
         if hw[0] != hw[1]:
             assert hw[0] == 2 * hw[1]
-            self.preprocess_x = nn.Sequential(nn.ReLU(), FactorizedReduce(c[0], channels, affine))
+            self.preprocess_x = nn.Sequential(nn.ReLU(inplace=False), FactorizedReduce(c[0], channels, affine))
             x_out_shape = [hw[1], hw[1], channels]
         elif c[0] != channels:
             self.preprocess_x = ReLUConvBN(c[0], channels, 1, 1, 0, affine)

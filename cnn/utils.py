@@ -182,7 +182,7 @@ def sample_arch(arch_pool, prob=None):
     N = len(arch_pool)
     indices = [i for i in range(N)]
     if prob is not None:
-        logging.info('Arch pool prob is provided, sampling according to the prob')
+        #logging.info('Arch pool prob is provided, sampling according to the prob')
         prob = np.array(prob, dtype=np.float32)
         prob = prob / prob.sum()
         index = np.random.choice(indices, p=prob)

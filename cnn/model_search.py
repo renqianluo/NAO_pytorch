@@ -40,46 +40,26 @@ class Node(nn.Module):
         
     def forward(self, x, x_id, x_op, y, y_id, y_op, step):
         if x_op == 0:
-            if x.size(1) != self.channels:
-                x = self.x_conv(x, x_id)
             x = self.x_sep_conv_3(x, x_id)
         elif x_op == 1:
-            if x.size(1) != self.channels:
-                x = self.x_conv(x, x_id)
             x = self.x_sep_conv_5(x, x_id)
         elif x_op == 2:
             x = self.x_avg_pool(x)
-            if x.size(1) != self.channels:
-                x = self.x_avg_pool_conv(x, x_id)
         elif x_op == 3:
             x = self.x_max_pool(x)
-            if x.size(1) != self.channels:
-                x = self.x_max_pool_conv(x, x_id)
         else:
             assert x_op == 4
-            if x.size(1) != self.channels:
-                x = self.x_conv(x, x_id)
         
         if y_op == 0:
-            if y.size(1) != self.channels:
-                y = self.y_conv(y, y_id)
             y = self.y_sep_conv_3(y, y_id)
         elif y_op == 1:
-            if y.size(1) != self.channels:
-                y = self.y_conv(y, y_id)
             y = self.y_sep_conv_5(y, y_id)
         elif y_op == 2:
             y = self.y_avg_pool(y)
-            if y.size(1) != self.channels:
-                y = self.y_avg_pool_conv(y, y_id)
         elif y_op == 3:
             y = self.y_max_pool(y)
-            if y.size(1) != self.channels:
-                y = self.y_max_pool_conv(y, y_id)
         else:
             assert y_op == 4
-            if y.size(1) != self.channels:
-                y = self.x_conv(y, y_id)
          
         if x_op != 4 and self.drop_path_keep_prob is not None and self.training:
             x = apply_drop_path(x, self.drop_path_keep_prob, self.layer_id, self.layers, step, self.steps)
@@ -114,7 +94,7 @@ class Cell(nn.Module):
             prev_layers.append(node.out_shape)
         out_hw = min([shape[0] for i, shape in enumerate(prev_layers)])
         
-        self.final_combine_conv = WSConv(self.nodes+2, channels, channels, 1)
+        self.final_combine_conv = WSReLUConvBN(self.nodes+2, channels, channels, 1)
         
         self.out_shape = [out_hw, out_hw, channels]
         
@@ -219,6 +199,3 @@ class NASNetwork(nn.Module):
         out = self.dropout(out)
         logits = self.classifier(out.view(out.size(0), -1))
         return logits, aux_logits
-    
-    def loss(self, logits, target):
-        return self.criterion(logits, target)
