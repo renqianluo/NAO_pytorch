@@ -43,6 +43,7 @@ parser.add_argument('--child_use_aux_head', action='store_true', default=False)
 parser.add_argument('--child_eval_epochs', type=str, default='20')
 parser.add_argument('--child_arch_pool', type=str, default=None)
 parser.add_argument('--controller_seed_arch', type=int, default=1000)
+parser.add_argument('--controller_discard', action='store_true', default=False)
 parser.add_argument('--controller_new_arch', type=int, default=300)
 parser.add_argument('--controller_random_arch', type=int, default=100)
 parser.add_argument('--controller_replace', action='store_true', default=False)
@@ -378,6 +379,9 @@ def main():
         if args.controller_replace:
             new_arch_pool = old_archs[:len(old_archs) - (num_new_archs + args.controller_random_arch)] + \
                             new_archs + utils.generate_arch(args.controller_random_arch, 5, 5)
+        elif args.controller_discard:
+            num_old_archs = len(old_archs)
+            new_arch_pool = old_archs[:num_old_archs//2] + new_archs + utils.generate_arch(args.controller_random_arch, 5, 5)
         else:
             new_arch_pool = old_archs + new_archs + utils.generate_arch(args.controller_random_arch, 5, 5)
         logging.info("Totally %d archs now to train", len(new_arch_pool))
