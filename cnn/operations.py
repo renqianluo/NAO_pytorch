@@ -61,7 +61,7 @@ class ReLUConvBN(nn.Module):
 
 class WSReLUConvBN(nn.Module):
     def __init__(self, num_possible_inputs, C_out, C_in, kernel_size, stride=1, padding=0):
-        super(WSConv, self).__init__()
+        super(WSReLUConvBN, self).__init__()
         self.stride = stride
         self.padding = padding
         self.relu = nn.ReLU(inplace=False),
