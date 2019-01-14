@@ -14,8 +14,7 @@ import torch.nn.functional as F
 import torchvision.datasets as dset
 import torch.backends.cudnn as cudnn
 from torch.autograd import Variable
-from model_search import NASNetwork
-from calculate_params import calculate_params
+from model_search_new import NASNetwork
 
 parser = argparse.ArgumentParser(description='NAO CIFAR-10')
 

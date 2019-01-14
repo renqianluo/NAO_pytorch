@@ -38,7 +38,7 @@ class Node(nn.Module):
                 x_shape = [x_shape[0], x_shape[1], channels]
         else:
             self.x_op = nn.Sequential(OPERATIONS[x_op](channels, x_stride, True))
-            if x_stride  > 1:
+            if x_stride > 1:
                 assert x_stride == 2
                 self.x_op.add_module('id_fact_reduce', FactorizedReduce(x_shape[-1], channels))
                 x_shape = [x_shape[0] // x_stride, x_shape[1] // x_stride, channels]

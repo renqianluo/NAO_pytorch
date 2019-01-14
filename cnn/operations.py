@@ -132,12 +132,11 @@ class SepConv(nn.Module):
 
 
 class WSSepConv(nn.Module):
-    def __init__(self, num_possible_inputs, C_in, C_out, kernel_size, stride, padding, affine=True):
+    def __init__(self, num_possible_inputs, C_in, C_out, kernel_size, padding, affine=True):
         super(WSSepConv, self).__init__()
         self.num_possible_inputs = num_possible_inputs
         self.C_out = C_out
         self.C_in = C_in
-        self.stride = stride
         self.padding = padding
         
         self.relu1 = nn.ReLU(inplace=False)
@@ -150,17 +149,37 @@ class WSSepConv(nn.Module):
         self.W2_pointwise = nn.ParameterList([nn.Parameter(torch.Tensor(C_out, C_in, 1, 1)) for i in range(num_possible_inputs)])
         self.bn2 = WSBN(num_possible_inputs, C_in, affine=affine)
     
-    def forward(self, x, x_id):
+    def forward(self, x, x_id, stride=1):
         x = self.relu1(x)
-        x = F.conv2d(x, self.W1_depthwise[x_id], stride=self.stride, padding=self.padding, groups=self.C_in)
+        x = F.conv2d(x, self.W1_depthwise[x_id], stride=stride, padding=self.padding, groups=self.C_in)
         x = F.conv2d(x, self.W1_pointwise[x_id], padding=0)
         x = self.bn1(x, x_id)
 
         x = self.relu2(x)
-        x = F.conv2d(x, self.W2_depthwise[x_id], padding=self.padding, groups=self.C_in)
+        x = F.conv2d(x, self.W2_depthwise[x_id], padding=stride, groups=self.C_in)
         x = F.conv2d(x, self.W2_pointwise[x_id], padding=0)
         x = self.bn2(x, x_id)
         return x
+
+
+class WSAvgPool2d(nn.Module):
+    def __init__(self, kernel_size, padding):
+        super(WSAvgPool2d, self).__init__()
+        self.kernel_size = kernel_size
+        self.padding = padding
+    
+    def forward(self, x, stride):
+        return F.avg_pool2d(x, self.kernel_size, stride, self.padding, count_include_pad=False)
+
+
+class WSMaxPool2d(nn.Module):
+    def __init__(self, kernel_size, padding):
+        super(WSAvgPool2d, self).__init__()
+        self.kernel_size = kernel_size
+        self.padding = padding
+    
+    def forward(self, x, stride):
+        return F.max_pool2d(x, self.kernel_size, stride, self.padding)
 
 
 class Identity(nn.Module):
