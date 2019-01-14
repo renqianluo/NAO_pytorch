@@ -182,7 +182,6 @@ def sample_arch(arch_pool, prob=None):
     N = len(arch_pool)
     indices = [i for i in range(N)]
     if prob is not None:
-        #logging.info('Arch pool prob is provided, sampling according to the prob')
         prob = np.array(prob, dtype=np.float32)
         prob = prob / prob.sum()
         index = np.random.choice(indices, p=prob)
@@ -205,6 +204,7 @@ def generate_arch(n, num_nodes, num_ops=7):
     archs = [[_get_arch(), _get_arch()] for i in range(n)] #[[[conv],[reduc]]]
     return archs
 
+
 def build_dag(arch):
     if arch is None:
         return None, None
@@ -215,9 +215,11 @@ def build_dag(arch):
     reduc_dag = arch[length//2:]
     return conv_dag, reduc_dag
 
+
 def parse_arch_to_seq(cell, branch_length):
     assert branch_length in [2, 3]
     seq = []
+    
     def _parse_op(op):
         if op == 0:
             return 7, 12
@@ -243,12 +245,15 @@ def parse_arch_to_seq(cell, branch_length):
             seq.extend([prev_node1, op11, op12, prev_node2, op21, op22]) #nopknopk
     return seq
 
+
 def parse_seq_to_arch(seq, branch_length):
     n = len(seq)
     assert branch_length in [2, 3]
     assert n // 2 // 5 // 2 == branch_length
+    
     def _parse_cell(cell_seq):
         cell_arch = []
+        
         def _recover_op(op1, op2):
             if op1 == 7:
                 return 0
@@ -290,18 +295,19 @@ def parse_seq_to_arch(seq, branch_length):
 
 
 def pairwise_accuracy(la, lb):
-    N = len(la)
-    assert N == len(lb)
+    n = len(la)
+    assert n == len(lb)
     total = 0
     count = 0
-    for i in range(N):
-        for j in range(i+1, N):
+    for i in range(n):
+        for j in range(i+1, n):
             if la[i] >= la[j] and lb[i] >= lb[j]:
                 count += 1
             if la[i] < la[j] and lb[i] < lb[j]:
                 count += 1
             total += 1
     return float(count) / total
+
 
 def hamming_distance(la, lb):
     N = len(la)
