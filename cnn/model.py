@@ -46,7 +46,6 @@ class Node(nn.Module):
                 self.x_op.add_module('id_conv', ReLUConvBN(x[-1], channels, 1, 1, 0))
                 x_shape = [x_shape[0], x_shape[1], channels]
         
-
         y_stride = stride if y_id in [0, 1] else 1
         if y_op in [0, 1]:
             self.y_op = nn.Sequential(OPERATIONS[y_op](channels, y_stride, True))

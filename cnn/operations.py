@@ -174,7 +174,7 @@ class WSAvgPool2d(nn.Module):
 
 class WSMaxPool2d(nn.Module):
     def __init__(self, kernel_size, padding):
-        super(WSAvgPool2d, self).__init__()
+        super(WSMaxPool2d, self).__init__()
         self.kernel_size = kernel_size
         self.padding = padding
     
