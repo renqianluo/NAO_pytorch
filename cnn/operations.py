@@ -156,7 +156,7 @@ class WSSepConv(nn.Module):
         x = self.bn1(x, x_id)
 
         x = self.relu2(x)
-        x = F.conv2d(x, self.W2_depthwise[x_id], padding=stride, groups=self.C_in)
+        x = F.conv2d(x, self.W2_depthwise[x_id], padding=self.padding, groups=self.C_in)
         x = F.conv2d(x, self.W2_pointwise[x_id], padding=0)
         x = self.bn2(x, x_id)
         return x

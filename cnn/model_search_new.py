@@ -79,9 +79,9 @@ class Node(nn.Module):
             if stride > 1:
                 assert stride == 2
                 if y_id == 0:
-                    y = self.x_id_reduce_1(x)
+                    y = self.x_id_reduce_1(y)
                 else:
-                    y = self.x_id_reduce_2(x)
+                    y = self.x_id_reduce_2(y)
          
         if x_op != 4 and self.drop_path_keep_prob is not None and self.training:
             x = apply_drop_path(x, self.drop_path_keep_prob, self.layer_id, self.layers, step, self.steps)
