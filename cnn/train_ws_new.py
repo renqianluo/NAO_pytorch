@@ -15,12 +15,13 @@ import torchvision.datasets as dset
 import torch.backends.cudnn as cudnn
 from torch.autograd import Variable
 from model_search import NASNetwork
-from calculate_params import calculate_params
+from model_search_new import NASNetwork as NASNetworkNew
 
 parser = argparse.ArgumentParser(description='NAO CIFAR-10')
 
 # Basic model parameters.
 parser.add_argument('--mode', type=str, default='train', choices=['train', 'test'])
+parser.add_argument('--net', type=str, default='NASNetwork', choices=['NASNetwork', 'NASNetworkNew'])
 parser.add_argument('--data_path', type=str, default='./data')
 parser.add_argument('--output_dir', type=str, default='models')
 parser.add_argument('--seed', type=int, default=None)
@@ -167,8 +168,10 @@ def main():
   
     # Train child model
     assert arch_pool is not None
-  
-    model = NASNetwork(args.layers, args.nodes, args.channels, args.keep_prob, args.drop_path_keep_prob, args.use_aux_head, args.steps)
+    if args.net == 'NASNetwork':
+        model = NASNetwork(args.layers, args.nodes, args.channels, args.keep_prob, args.drop_path_keep_prob, args.use_aux_head, args.steps)
+    else:
+        model = NASNetworkNew(args.layers, args.nodes, args.channels, args.keep_prob, args.drop_path_keep_prob, args.use_aux_head, args.steps)
     criterion = nn.CrossEntropyLoss()
     if torch.cuda.device_count() > 1:
         model = nn.DataParallel(model)
@@ -213,17 +216,20 @@ def main():
         rest_arch_indices = arch_sorted_indices[args.top_to_train:]
         valid_accuracy_list = [100.0 for i in range(len(arch_pool))]
         
+        if torch.cuda.device_count() > 1:
+            model_save = model.module.new()
+        else:
+            model_save = model.new()
+        model_save.load_state_dict(model.state_dict())
         for index in top_arch_indices:
             arch = arch_pool[index]
             logging.info('Stand alone training arch %s', ' '.join(map(str, arch[0]+arch[1])))
             step_clone = step
+            model_clone = model_save.new()
             if torch.cuda.device_count() > 1:
-                model_clone = model.module.new()
                 model_clone = nn.DataParallel(model_clone)
-            else:
-                model_clone = model.new()
             model_clone = model_clone.cuda()
-            model_clone.load_state_dict(model.state_dict())
+            model_clone.load_state_dict(model_save.state_dict())
             optimizer_clone = torch.optim.SGD(model_clone.parameters(), args.lr_max,
                                               momentum=0.9, weight_decay=args.l2_reg)
             optimizer_clone.load_state_dict(optimizer.state_dict())
@@ -237,7 +243,8 @@ def main():
             valid_accuracy_list[index] = valid_acc
             for prm, prm_clone in zip(model.parameters(), model_clone.parameters()):
                 prm.data = prm.data + prm_clone.data
-                
+        del model_clone
+        del model_save
         # Merge models
         for prm in model.parameters():
             prm.data = prm.data / (args.top_to_train + 1)
