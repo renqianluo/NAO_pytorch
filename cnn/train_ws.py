@@ -136,7 +136,7 @@ def main():
     train_transform, valid_transform = utils._data_transforms_cifar10(args.cutout_size)
     train_data = dset.CIFAR10(root=args.data_path, train=True, download=True, transform=train_transform)
     valid_data = dset.CIFAR10(root=args.data_path, train=False, download=True, transform=valid_transform)
-    train_queue = torch.utils.data.DataLoader(train_data, batch_size=args.batch_size, pin_memory=True, num_workers=16)
+    train_queue = torch.utils.data.DataLoader(train_data, batch_size=args.batch_size, shuffle=True, pin_memory=True, num_workers=16)
     valid_queue = torch.utils.data.DataLoader(valid_data, batch_size=args.eval_batch_size, pin_memory=True, num_workers=16)
   
     # Train child model
