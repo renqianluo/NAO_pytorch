@@ -3,7 +3,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 from torch.autograd import Variable
 
-INPLACE=True
+INPLACE=False
 
 OPERATIONS = {
     0: lambda C, stride, affine: SepConv(C, C, 3, stride, 1, affine=affine), # sep conv 3 x 3
