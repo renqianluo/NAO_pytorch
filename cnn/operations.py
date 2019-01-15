@@ -21,7 +21,9 @@ def apply_drop_path(x, drop_path_keep_prob, layer_id, layers, step, steps):
     if drop_path_keep_prob < 1.:
         noise_shape = [x.size(0), 1, 1, 1]
         mask = Variable(torch.cuda.FloatTensor(*noise_shape).bernoulli_(drop_path_keep_prob))
-        x = x / drop_path_keep_prob * mask
+        x.div_(drop_path_keep_prob)
+        x.mul_(mask)
+        #x = x / drop_path_keep_prob * mask
     return x
 
 
@@ -132,7 +134,7 @@ class SepConv(nn.Module):
 
 
 class WSSepConv(nn.Module):
-    def __init__(self, num_possible_inputs, C_in, C_out, kernel_size, padding, affine=True):
+    def __init__(self, num_possible_inputs, C_in, C_out, kernel_size, stride, padding, affine=True):
         super(WSSepConv, self).__init__()
         self.num_possible_inputs = num_possible_inputs
         self.C_out = C_out

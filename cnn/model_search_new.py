@@ -25,8 +25,8 @@ class Node(nn.Module):
         # max_pool
         self.x_max_pool = WSMaxPool2d(3, padding=1)
         # sep_conv
-        self.x_sep_conv_3 = WSSepConv(num_possible_inputs, channels, channels, 3, 1)
-        self.x_sep_conv_5 = WSSepConv(num_possible_inputs, channels, channels, 5, 2)
+        self.x_sep_conv_3 = WSSepConv(num_possible_inputs, channels, channels, 3, None, 1)
+        self.x_sep_conv_5 = WSSepConv(num_possible_inputs, channels, channels, 5, None, 2)
         if self.stride > 1:
             assert self.stride == 2
             self.x_id_reduce_1 = FactorizedReduce(prev_layers[0][-1], channels)
@@ -37,8 +37,8 @@ class Node(nn.Module):
         # max_pool
         self.y_max_pool = WSMaxPool2d(3, padding=1)
         # sep_conv
-        self.y_sep_conv_3 = WSSepConv(num_possible_inputs, channels, channels, 3, 1)
-        self.y_sep_conv_5 = WSSepConv(num_possible_inputs, channels, channels, 5, 2)
+        self.y_sep_conv_3 = WSSepConv(num_possible_inputs, channels, channels, 3, None, 1)
+        self.y_sep_conv_5 = WSSepConv(num_possible_inputs, channels, channels, 5, None, 2)
         if self.stride > 1:
             assert self.stride == 2
             self.y_id_reduce_1 = FactorizedReduce(prev_layers[0][-1], channels)
@@ -115,7 +115,10 @@ class Cell(nn.Module):
             self.ops.append(node)
             prev_layers.append(node.out_shape)
         out_hw = min([shape[0] for i, shape in enumerate(prev_layers)])
-        
+
+        if reduction:
+            self.fac_1 = FactorizedReduce(prev_layer[0][-1], channels)
+            self.fac_2 = FactorizedReduce(prev_layer[1][-1], channels)
         self.final_combine_conv = WSReLUConvBN(self.nodes+2, channels, channels, 1)
         
         self.out_shape = [out_hw, out_hw, channels]
@@ -134,7 +137,13 @@ class Cell(nn.Module):
         for i, c in enumerate(used):
             if used[i] == 0:
                 concat.append(i)
-                
+        
+        # Notice that in reduction cell, 0, 1 might be concated and they might have to be factorized
+        if self.reduction:
+            if 0 in concat:
+                states[0] = self.fac_1(states[0])
+            if 1 in concat:
+                states[1] = self.fac_2(states[1])
         out = torch.cat([states[i] for i in concat], dim=1)
         out = self.final_combine_conv(out, concat)
         return out
