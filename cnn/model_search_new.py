@@ -187,7 +187,7 @@ class NASNetwork(nn.Module):
             if self.use_aux_head and i == self.aux_head_index:
                 self.aux_head = AuxHead(outs[-1][-1])
 
-        self.relu = nn.ReLU(inplace=False)
+        self.relu = nn.ReLU(inplace=True)
         self.global_pooling = nn.AdaptiveAvgPool2d(1)
         self.dropout = nn.Dropout(1 - self.keep_prob)
         self.classifier = nn.Linear(outs[-1][-1], 10)

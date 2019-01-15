@@ -3,6 +3,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 from torch.autograd import Variable
 
+INPLACE=True
 
 OPERATIONS = {
     0: lambda C, stride, affine: SepConv(C, C, 3, stride, 1, affine=affine), # sep conv 3 x 3
@@ -31,14 +32,14 @@ class AuxHead(nn.Module):
     def __init__(self, C_in):
         super(AuxHead, self).__init__()
         self.ops = nn.Sequential(
-            nn.ReLU(inplace=False),
+            nn.ReLU(inplace=INPLACE),
             nn.AvgPool2d(5, stride=3, padding=0, count_include_pad=False),
             nn.Conv2d(C_in, 128, 1, bias=False),
             nn.BatchNorm2d(128),
-            nn.ReLU(inplace=False),
+            nn.ReLU(inplace=INPLACE),
             nn.Conv2d(128, 768, 2, bias=False),
             nn.BatchNorm2d(768),
-            nn.ReLU(inplace=False),
+            nn.ReLU(inplace=INPLACE),
         )
         self.classifier = nn.Linear(768, 10)
         
@@ -52,7 +53,7 @@ class ReLUConvBN(nn.Module):
     def __init__(self, C_in, C_out, kernel_size, stride, padding, affine=True):
         super(ReLUConvBN, self).__init__()
         self.op = nn.Sequential(
-            nn.ReLU(inplace=False),
+            nn.ReLU(inplace=INPLACE),
             nn.Conv2d(C_in, C_out, kernel_size, stride=stride, padding=padding, bias=False),
             nn.BatchNorm2d(C_out, affine=affine)
         )
@@ -66,7 +67,7 @@ class WSReLUConvBN(nn.Module):
         super(WSReLUConvBN, self).__init__()
         self.stride = stride
         self.padding = padding
-        self.relu = nn.ReLU(inplace=False)
+        self.relu = nn.ReLU(inplace=INPLACE)
         self.w = nn.ParameterList([nn.Parameter(torch.Tensor(C_out, C_in, kernel_size, kernel_size)) for _ in range(num_possible_inputs)])
         self.bn = nn.BatchNorm2d(C_out, affine=True)
     
@@ -119,11 +120,11 @@ class SepConv(nn.Module):
     def __init__(self, C_in, C_out, kernel_size, stride, padding, affine=True):
         super(SepConv, self).__init__()
         self.op = nn.Sequential(
-            nn.ReLU(inplace=False),
+            nn.ReLU(inplace=INPLACE),
             nn.Conv2d(C_in, C_in, kernel_size=kernel_size, stride=stride, padding=padding, groups=C_in, bias=False),
             nn.Conv2d(C_in, C_in, kernel_size=1, padding=0, bias=False),
             nn.BatchNorm2d(C_in, affine=affine),
-            nn.ReLU(inplace=False),
+            nn.ReLU(inplace=INPLACE),
             nn.Conv2d(C_in, C_in, kernel_size=kernel_size, stride=1, padding=padding, groups=C_in, bias=False),
             nn.Conv2d(C_in, C_out, kernel_size=1, padding=0, bias=False),
             nn.BatchNorm2d(C_out, affine=affine),
@@ -141,12 +142,12 @@ class WSSepConv(nn.Module):
         self.C_in = C_in
         self.padding = padding
         
-        self.relu1 = nn.ReLU(inplace=False)
+        self.relu1 = nn.ReLU(inplace=INPLACE)
         self.W1_depthwise = nn.ParameterList([nn.Parameter(torch.Tensor(C_in, 1, kernel_size, kernel_size)) for i in range(num_possible_inputs)])
         self.W1_pointwise = nn.ParameterList([nn.Parameter(torch.Tensor(C_out, C_in, 1, 1)) for i in range(num_possible_inputs)])
         self.bn1 = WSBN(num_possible_inputs, C_in, affine=affine)
 
-        self.relu2 = nn.ReLU(inplace=False)
+        self.relu2 = nn.ReLU(inplace=INPLACE)
         self.W2_depthwise = nn.ParameterList([nn.Parameter(torch.Tensor(C_in, 1, kernel_size, kernel_size)) for i in range(num_possible_inputs)])
         self.W2_pointwise = nn.ParameterList([nn.Parameter(torch.Tensor(C_out, C_in, 1, 1)) for i in range(num_possible_inputs)])
         self.bn2 = WSBN(num_possible_inputs, C_in, affine=affine)
@@ -221,7 +222,7 @@ class MaybeCalibrateSize(nn.Module):
         y_out_shape = [hw[1], hw[1], c[1]]
         if hw[0] != hw[1]:
             assert hw[0] == 2 * hw[1]
-            self.preprocess_x = nn.Sequential(nn.ReLU(inplace=False), FactorizedReduce(c[0], channels, affine))
+            self.preprocess_x = nn.Sequential(nn.ReLU(inplace=INPLACE), FactorizedReduce(c[0], channels, affine))
             x_out_shape = [hw[1], hw[1], channels]
         elif c[0] != channels:
             self.preprocess_x = ReLUConvBN(c[0], channels, 1, 1, 0, affine)
