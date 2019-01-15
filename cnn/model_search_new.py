@@ -117,8 +117,8 @@ class Cell(nn.Module):
         out_hw = min([shape[0] for i, shape in enumerate(prev_layers)])
 
         if reduction:
-            self.fac_1 = FactorizedReduce(prev_layer[0][-1], channels)
-            self.fac_2 = FactorizedReduce(prev_layer[1][-1], channels)
+            self.fac_1 = FactorizedReduce(prev_layers[0][-1], channels)
+            self.fac_2 = FactorizedReduce(prev_layers[1][-1], channels)
         self.final_combine_conv = WSReLUConvBN(self.nodes+2, channels, channels, 1)
         
         self.out_shape = [out_hw, out_hw, channels]
