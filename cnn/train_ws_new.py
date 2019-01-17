@@ -15,13 +15,11 @@ import torchvision.datasets as dset
 import torch.backends.cudnn as cudnn
 from torch.autograd import Variable
 from model_search import NASNetwork
-from model_search_new import NASNetwork as NASNetworkNew
 
 parser = argparse.ArgumentParser(description='NAO CIFAR-10')
 
 # Basic model parameters.
 parser.add_argument('--mode', type=str, default='train', choices=['train', 'test'])
-parser.add_argument('--net', type=str, default='NASNetwork', choices=['NASNetwork', 'NASNetworkNew'])
 parser.add_argument('--data_path', type=str, default='./data')
 parser.add_argument('--output_dir', type=str, default='models')
 parser.add_argument('--seed', type=int, default=None)
@@ -168,10 +166,7 @@ def main():
   
     # Train child model
     assert arch_pool is not None
-    if args.net == 'NASNetwork':
-        model = NASNetwork(args.layers, args.nodes, args.channels, args.keep_prob, args.drop_path_keep_prob, args.use_aux_head, args.steps)
-    else:
-        model = NASNetworkNew(args.layers, args.nodes, args.channels, args.keep_prob, args.drop_path_keep_prob, args.use_aux_head, args.steps)
+    model = NASNetwork(args.layers, args.nodes, args.channels, args.keep_prob, args.drop_path_keep_prob, args.use_aux_head, args.steps)
     criterion = nn.CrossEntropyLoss()
     if torch.cuda.device_count() > 1:
         model = nn.DataParallel(model)

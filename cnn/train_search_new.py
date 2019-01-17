@@ -27,7 +27,7 @@ parser.add_argument('--output_dir', type=str, default='models')
 parser.add_argument('--seed', type=int, default=None)
 parser.add_argument('--child_sample_policy', type=str, default=None)
 parser.add_argument('--child_batch_size', type=int, default=160)
-parser.add_argument('--child_eval_batch_size', type=int, default=500)
+parser.add_argument('--child_eval_batch_size', type=int, default=1000)
 parser.add_argument('--child_epochs', type=int, default=100)
 parser.add_argument('--child_layers', type=int, default=2)
 parser.add_argument('--child_nodes', type=int, default=5)
@@ -36,14 +36,17 @@ parser.add_argument('--child_cutout_size', type=int, default=None)
 parser.add_argument('--child_grad_bound', type=float, default=5.0)
 parser.add_argument('--child_lr_max', type=float, default=0.025)
 parser.add_argument('--child_lr_min', type=float, default=0.001)
-parser.add_argument('--child_keep_prob', type=float, default=0.8)
+parser.add_argument('--child_keep_prob', type=float, default=1.0)
 parser.add_argument('--child_drop_path_keep_prob', type=float, default=1.0)
 parser.add_argument('--child_l2_reg', type=float, default=3e-4)
 parser.add_argument('--child_use_aux_head', action='store_true', default=False)
 parser.add_argument('--child_eval_epochs', type=str, default='20')
 parser.add_argument('--child_arch_pool', type=str, default=None)
+parser.add_argument('--child_stand_alone_epochs', type=int, default=2)
 parser.add_argument('--controller_seed_arch', type=int, default=1000)
+parser.add_argument('--controller_discard', action='store_true', default=False)
 parser.add_argument('--controller_new_arch', type=int, default=300)
+parser.add_argument('--controller_top_to_train', type=int, default=20)
 parser.add_argument('--controller_random_arch', type=int, default=100)
 parser.add_argument('--controller_replace', action='store_true', default=False)
 parser.add_argument('--controller_encoder_layers', type=int, default=1)
@@ -193,6 +196,7 @@ def nao_infer(queue, model, step):
     model.eval()
     for i, sample in enumerate(queue):
         encoder_input = sample['encoder_input']
+        encoder_input = Variable(encoder_input).cuda()
         model.zero_grad()
         new_arch = model.generate_new_arch(encoder_input, step)
         new_arch_list.extend(new_arch.data.squeeze().tolist())
@@ -244,9 +248,30 @@ def main():
 
     model = NASNetwork(args.child_layers, args.child_nodes, args.child_channels, args.child_keep_prob,
                        args.child_drop_path_keep_prob, args.child_use_aux_head, args.steps)
+    if torch.cuda.device_count() > 1:
+        model = nn.DataParallel(model)
     model = model.cuda()
     criterion = nn.CrossEntropyLoss().cuda()
     logging.info("param size = %fMB", utils.count_parameters_in_MB(model))
+    nao = NAO(
+        args.controller_encoder_layers,
+        args.controller_encoder_vocab_size,
+        args.controller_encoder_hidden_size,
+        args.controller_encoder_dropout,
+        args.controller_encoder_length,
+        args.controller_source_length,
+        args.controller_encoder_emb_size,
+        args.controller_mlp_layers,
+        args.controller_mlp_hidden_size,
+        args.controller_mlp_dropout,
+        args.controller_decoder_layers,
+        args.controller_decoder_vocab_size,
+        args.controller_decoder_hidden_size,
+        args.controller_decoder_dropout,
+        args.controller_decoder_length,
+    )
+    logging.info("param size = %fMB", utils.count_parameters_in_MB(nao))
+    nao = nao.cuda()
 
     optimizer = torch.optim.SGD(
         model.parameters(),
@@ -272,7 +297,7 @@ def main():
         else:
             raise ValueError('Child model arch pool sample policy is not provided!')
 
-    eval_points = utils.generate_eval_points(args.eval_epochs, args.stand_alone_epochs, args.epochs)
+    eval_points = utils.generate_eval_points(args.child_eval_epochs, args.child_stand_alone_epochs, args.child_epochs)
     step = 0
     for epoch in range(1, args.child_epochs + 1):
         scheduler.step()
@@ -295,28 +320,52 @@ def main():
         old_archs = np.array(old_archs)[old_archs_sorted_indices].tolist()
         old_archs_perf = np.array(old_archs_perf)[old_archs_sorted_indices].tolist()
         
-        top_archs = old_archs[:10]
+        top_archs = old_archs[:args.controller_top_to_train]
         valid_accuracy_list = []
+        if torch.cuda.device_count() > 1:
+            model_save = model.module.new()
+        else:
+            model_save = model.new()
+        model_save.load_state_dict(model.state_dict())
         for arch in top_archs:
-            model_clone = model.new()
+            logging.info('Stand alone training arch %s', ' '.join(map(str, arch[0] + arch[1])))
+            step_clone = step
+            model_clone = model_save.new()
             if torch.cuda.device_count() > 1:
                 model_clone = nn.DataParallel(model_clone)
             model_clone = model_clone.cuda()
+            model_clone.load_state_dict(model_save.state_dict())
             optimizer_clone = torch.optim.SGD(model_clone.parameters(), args.child_lr_max,
                                               momentum=0.9, weight_decay=args.child_l2_reg)
+            optimizer_clone.load_state_dict(optimizer.state_dict())
             scheduler_clone = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer_clone, float(args.child_epochs),
                                                                          args.child_lr_min, epoch-1)
-            scheduler_clone.step()
-            train_acc, train_obj, step = child_train(train_queue, model_clone, optimizer_clone, step, [arch], None, criterion)
-            logging.info('train_acc %f', train_acc)
+            for i in range(args.child_stand_alone_epochs):
+                scheduler_clone.step()
+                train_acc, train_obj, step_clone = child_train(train_queue, model_clone, optimizer_clone, step_clone, [arch], None, criterion)
+                logging.info('train epoch %03d train_acc %f', i, train_acc)
             valid_acc = child_valid(valid_queue, model_clone, [arch], criterion)[0]
             valid_accuracy_list.append(valid_acc)
             for prm, prm_clone in zip(model.parameters(), model_clone.parameters()):
-                prm.data.copy_(prm_clone.data)
+                prm.data = prm.data + prm_clone.data
+        
+        del model_clone
+        del model_save
+        
         # Merge models
         for prm in model.parameters():
-            prm.data = prm.data / (len(top_archs) + 1)
-        valid_accuracy_list += child_valid(valid_queue, model, old_archs[10:], criterion)
+            prm.data = prm.data / (args.controller_top_to_train + 1)
+        valid_accuracy_list += child_valid(valid_queue, model, old_archs[args.controller_top_to_train:], criterion)
+
+        # Update epoch and scheduler
+        for i in range(args.child_stand_alone_epochs):
+            epoch += 1
+            scheduler.step()
+
+        old_archs_perf = [1 - i for i in valid_accuracy_list]
+        old_archs_sorted_indices = np.argsort(old_archs_perf)
+        old_archs = np.array(old_archs)[old_archs_sorted_indices].tolist()
+        old_archs_perf = np.array(old_archs_perf)[old_archs_sorted_indices].tolist()
         
         with open(os.path.join(args.output_dir, 'arch_pool.{}'.format(epoch)), 'w') as fa:
             with open(os.path.join(args.output_dir, 'arch_pool.perf.{}'.format(epoch)), 'w') as fp:
@@ -340,25 +389,6 @@ def main():
         max_val = max(old_archs_perf)
         encoder_target = [(i - min_val) / (max_val - min_val) for i in old_archs_perf]
 
-        nao = NAO(
-            args.controller_encoder_layers,
-            args.controller_encoder_vocab_size,
-            args.controller_encoder_hidden_size,
-            args.controller_encoder_dropout,
-            args.controller_encoder_length,
-            args.controller_source_length,
-            args.controller_encoder_emb_size,
-            args.controller_mlp_layers,
-            args.controller_mlp_hidden_size,
-            args.controller_mlp_dropout,
-            args.controller_decoder_layers,
-            args.controller_decoder_vocab_size,
-            args.controller_decoder_hidden_size,
-            args.controller_decoder_dropout,
-            args.controller_decoder_length,
-        )
-        logging.info("param size = %fMB", utils.count_parameters_in_MB(nao))
-        nao = nao.cuda()
         nao_train_dataset = utils.NAODataset(encoder_input, encoder_target, True, swap=True)
         nao_valid_dataset = utils.NAODataset(encoder_input, encoder_target, False)
         nao_train_queue = torch.utils.data.DataLoader(
@@ -376,7 +406,7 @@ def main():
 
         # Generate new archs
         new_archs = []
-        max_step_size = 100
+        max_step_size = 50
         predict_step_size = 0
         top100_archs = list(map(lambda x: utils.parse_arch_to_seq(x[0], 2) + utils.parse_arch_to_seq(x[1], 2), old_archs[:100]))
         nao_infer_dataset = utils.NAODataset(top100_archs, None, False)
@@ -398,9 +428,11 @@ def main():
         new_archs = list(map(lambda x: utils.parse_seq_to_arch(x, 2), new_archs))  # [[[conv],[reduc]]]
         num_new_archs = len(new_archs)
         logging.info("Generate %d new archs", num_new_archs)
-        if args.replace:
+        if args.controller_replace:
             new_arch_pool = old_archs[:len(old_archs) - (num_new_archs + args.controller_random_arch)] + \
                             new_archs + utils.generate_arch(args.controller_random_arch, 5, 5)
+        elif args.controller_discard:
+            new_arch_pool = old_archs[:100] + new_archs + utils.generate_arch(args.controller_random_arch, 5, 5)
         else:
             new_arch_pool = old_archs + new_archs + utils.generate_arch(args.controller_random_arch, 5, 5)
         logging.info("Totally %d archs now to train", len(new_arch_pool))

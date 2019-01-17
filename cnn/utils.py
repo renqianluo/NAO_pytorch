@@ -3,6 +3,8 @@ import numpy as np
 import logging
 import torch
 import shutil
+import torch
+import torch.nn as nn
 import torch.utils.data
 import torchvision.transforms as transforms
 from torch.autograd import Variable

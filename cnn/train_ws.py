@@ -14,7 +14,7 @@ import torch.nn.functional as F
 import torchvision.datasets as dset
 import torch.backends.cudnn as cudnn
 from torch.autograd import Variable
-from model_search_new import NASNetwork
+from model_search import NASNetwork
 
 parser = argparse.ArgumentParser(description='NAO CIFAR-10')
 
@@ -159,7 +159,7 @@ def main():
     if optimizer_state_dict is not None:
         optimizer.load_state_dict(optimizer_state_dict)
     
-    scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, float(args.epochs), args.lr_min, epoch-1)
+    scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, float(args.epochs), args.lr_min, epoch % eval_epochs-1)
 
     eval_points = utils.generate_eval_points(eval_epochs, 0, args.epochs)
     step = 0
@@ -184,6 +184,7 @@ def main():
                 arch = ' '.join(map(str, arch[0] + arch[1]))
                 f.write('arch: {}\tvalid acc: {}\n'.format(arch, perf))
         utils.save(args.output_dir, args, model, epoch, step, optimizer)
+        scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, float(args.epochs), args.lr_min)
       
 
 if __name__ == '__main__':

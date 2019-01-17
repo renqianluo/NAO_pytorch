@@ -24,7 +24,6 @@ def apply_drop_path(x, drop_path_keep_prob, layer_id, layers, step, steps):
         mask = Variable(torch.cuda.FloatTensor(*noise_shape).bernoulli_(drop_path_keep_prob))
         x.div_(drop_path_keep_prob)
         x.mul_(mask)
-        #x = x / drop_path_keep_prob * mask
     return x
 
 

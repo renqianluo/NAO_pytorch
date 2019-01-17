@@ -5,8 +5,8 @@ import torch
 import torch.nn as nn
 from torch.autograd import Variable
 import torch.nn.functional as F
-from encoder import encoder
-from decoder import decoder
+from encoder import Encoder
+from decoder import Decoder
 
 
 SOS_ID = 0
@@ -32,7 +32,7 @@ class NAO(nn.Module):
                  decoder_length,
                  ):
         super(NAO, self).__init__()
-        self.encoder = encoder.Encoder(
+        self.encoder = Encoder(
             encoder_layers,
             encoder_vocab_size,
             encoder_hidden_size,
@@ -44,7 +44,7 @@ class NAO(nn.Module):
             mlp_hidden_size,
             mlp_dropout,
         )
-        self.decoder = decoder.Decoder(
+        self.decoder = Decoder(
             decoder_layers,
             decoder_vocab_size,
             decoder_hidden_size,
@@ -54,6 +54,7 @@ class NAO(nn.Module):
         )
 
         self.init_parameters()
+        self.flatten_parameters()
 
     def init_parameters(self):
         for w in self.parameters():
