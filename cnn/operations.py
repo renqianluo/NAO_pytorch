@@ -27,9 +27,9 @@ def apply_drop_path(x, drop_path_keep_prob, layer_id, layers, step, steps):
     return x
 
 
-class AuxHead(nn.Module):
-    def __init__(self, C_in):
-        super(AuxHead, self).__init__()
+class AuxHeadCIFAR(nn.Module):
+    def __init__(self, C_in, classes):
+        super(AuxHeadCIFAR, self).__init__()
         self.ops = nn.Sequential(
             nn.ReLU(inplace=INPLACE),
             nn.AvgPool2d(5, stride=3, padding=0, count_include_pad=False),
@@ -40,8 +40,30 @@ class AuxHead(nn.Module):
             nn.BatchNorm2d(768),
             nn.ReLU(inplace=INPLACE),
         )
-        self.classifier = nn.Linear(768, 10)
+        self.classifier = nn.Linear(768, classes)
         
+    def forward(self, x):
+        x = self.ops(x)
+        x = self.classifier(x.view(x.size(0), -1))
+        return x
+
+
+class AuxHeadImageNet(nn.Module):
+    def __init__(self, C_in, classes):
+        """input should be in [B, C, 14, 14]"""
+        super(AuxHeadImageNet, self).__init__()
+        self.ops = nn.Sequential(
+            nn.ReLU(inplace=INPLACE),
+            nn.AvgPool2d(5, stride=2, padding=0, count_include_pad=False),
+            nn.Conv2d(C_in, 128, 1, bias=False),
+            nn.BatchNorm2d(128),
+            nn.ReLU(inplace=INPLACE),
+            nn.Conv2d(128, 768, 2, bias=False),
+            nn.BatchNorm2d(768),
+            nn.ReLU(inplace=INPLACE),
+        )
+        self.classifier = nn.Linear(768, classes)
+    
     def forward(self, x):
         x = self.ops(x)
         x = self.classifier(x.view(x.size(0), -1))

@@ -170,7 +170,7 @@ def load(model_path):
   
 def create_exp_dir(path, scripts_to_save=None):
     if not os.path.exists(path):
-        os.makekdirs(path)
+        os.makedirs(path)
         print('Experiment dir : {}'.format(path))
 
     if scripts_to_save is not None:

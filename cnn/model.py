@@ -7,7 +7,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from operations import *
-from torch.autograd import Variable
+from torch import Tensor
 import utils
     
 
@@ -134,9 +134,10 @@ class Cell(nn.Module):
         return self.final_combine(states)
         
 
-class NASNetwork(nn.Module):
-    def __init__(self, layers, nodes, channels, keep_prob, drop_path_keep_prob, use_aux_head, steps, arch):
-        super(NASNetwork, self).__init__()
+class NASNetworkCIFAR(nn.Module):
+    def __init__(self, classes, layers, nodes, channels, keep_prob, drop_path_keep_prob, use_aux_head, steps, arch):
+        super(NASNetworkCIFAR, self).__init__()
+        self.classes = classes
         self.layers = layers
         self.nodes = nodes
         self.channels = channels
@@ -172,7 +173,7 @@ class NASNetwork(nn.Module):
             outs = [outs[-1], cell.out_shape]
             
             if self.use_aux_head and i == self.aux_head_index:
-                self.aux_head = AuxHead(outs[-1][-1])
+                self.aux_head = AuxHeadCIFAR(outs[-1][-1], classes)
         
         self.relu = nn.ReLU(inplace=False)
         self.global_pooling = nn.AdaptiveAvgPool2d(1)
@@ -198,6 +199,83 @@ class NASNetwork(nn.Module):
         out = self.dropout(out)
         logits = self.classifier(out.view(out.size(0), -1))
         return logits, aux_logits
+
+
+class NASNetworkImageNet(nn.Module):
+    def __init__(self, classes, layers, nodes, channels, keep_prob, drop_path_keep_prob, use_aux_head, steps, arch):
+        super(NASNetworkImageNet, self).__init__()
+        self.classes = classes
+        self.layers = layers
+        self.nodes = nodes
+        self.channels = channels
+        self.keep_prob = keep_prob
+        self.drop_path_keep_prob = drop_path_keep_prob
+        self.use_aux_head = use_aux_head
+        self.steps = steps
+        arch = list(map(int, arch.strip().split()))
+        self.conv_arch = arch[:4 * self.nodes]
+        self.reduc_arch = arch[4 * self.nodes:]
+        
+        self.pool_layers = [self.layers, 2 * self.layers + 1]
+        self.layers = self.layers * 3
+        
+        if self.use_aux_head:
+            self.aux_head_index = self.pool_layers[-1]  # + 1
+
+        channels = self.channels
+        self.stem0 = nn.Sequential(
+            nn.Conv2d(3, channels // 2, 3, stride=2, padding=1, bias=False),
+            nn.BatchNorm2d(channels // 2),
+            nn.ReLU(inplace=False),
+            nn.Conv2d(channels // 2, channels, 3, stride=2, padding=1, bias=False),
+            nn.BatchNorm2d(channels // 2),
+        )
+
+        self.stem1 = nn.Sequential(
+            nn.ReLU(inplace=False),
+            nn.Conv2d(channels, channels, 3, stride=2, padding=1, bias=False),
+            nn.BatchNorm2d(channels),
+        )
+        
+        outs = [[112, 112, channels // 2], [56, 56, channels]]
+        channels = self.channels
+        self.cells = nn.ModuleList()
+        for i in range(self.layers + 2):
+            if i not in self.pool_layers:
+                cell = Cell(self.conv_arch, outs, channels, False, i, self.layers + 2, self.steps,
+                            self.drop_path_keep_prob)
+            else:
+                channels *= 2
+                cell = Cell(self.reduc_arch, outs, channels, True, i, self.layers + 2, self.steps,
+                            self.drop_path_keep_prob)
+            self.cells.append(cell)
+            outs = [outs[-1], cell.out_shape]
+            
+            if self.use_aux_head and i == self.aux_head_index:
+                self.aux_head = AuxHeadImageNet(outs[-1][-1], classes)
+        
+        self.relu = nn.ReLU(inplace=False)
+        self.global_pooling = nn.AdaptiveAvgPool2d(1)
+        self.dropout = nn.Dropout(1 - self.keep_prob)
+        self.classifier = nn.Linear(outs[-1][-1], 10)
+        
+        self.init_parameters()
     
-    def loss(self, logits, target):
-        return self.criterion(logits, target)
+    def init_parameters(self):
+        for w in self.parameters():
+            if w.data.dim() == 4:
+                nn.init.kaiming_normal(w.data)
+    
+    def forward(self, input, step=None):
+        aux_logits = None
+        s0 = self.stem0(input)
+        s1 = self.stem1(s0)
+        for i, cell in enumerate(self.cells):
+            s0, s1 = s1, cell(s0, s1, step)
+            if self.use_aux_head and i == self.aux_head_index and self.training:
+                aux_logits = self.aux_head(s1)
+        out = self.relu(s1)
+        out = self.global_pooling(out)
+        out = self.dropout(out)
+        logits = self.classifier(out.view(out.size(0), -1))
+        return logits, aux_logits

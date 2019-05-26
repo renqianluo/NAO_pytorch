@@ -11,7 +11,7 @@ import argparse
 import torch.nn as nn
 import torch.utils
 import torch.nn.functional as F
-from torch.autograd import Variable
+from torch import Tensor
 import torchvision.datasets as dset
 import torch.backends.cudnn as cudnn
 from model import NASNetwork
