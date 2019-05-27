@@ -46,12 +46,12 @@ class Node(nn.Module):
             
         self.out_shape = [prev_layers[0][0]//stride, prev_layers[0][1]//stride, channels]
         
-    def forward(self, x, x_id, x_op, y, y_id, y_op, step):
+    def forward(self, x, x_id, x_op, y, y_id, y_op, step, bn_train=False):
         stride = self.stride if x_id in [0, 1] else 1
         if x_op == 0:
-            x = self.x_sep_conv_3(x, x_id, stride)
+            x = self.x_sep_conv_3(x, x_id, stride, bn_train=bn_train)
         elif x_op == 1:
-            x = self.x_sep_conv_5(x, x_id, stride)
+            x = self.x_sep_conv_5(x, x_id, stride, bn_train=bn_train)
         elif x_op == 2:
             x = self.x_avg_pool(x, stride)
         elif x_op == 3:
@@ -61,15 +61,15 @@ class Node(nn.Module):
             if stride > 1:
                 assert stride == 2
                 if x_id == 0:
-                    x = self.x_id_reduce_1(x)
+                    x = self.x_id_reduce_1(x, bn_train=bn_train)
                 else:
-                    x = self.x_id_reduce_2(x)
+                    x = self.x_id_reduce_2(x, bn_train=bn_train)
 
         stride = self.stride if y_id in [0, 1] else 1
         if y_op == 0:
-            y = self.y_sep_conv_3(y, y_id, stride)
+            y = self.y_sep_conv_3(y, y_id, stride, bn_train=bn_train)
         elif y_op == 1:
-            y = self.y_sep_conv_5(y, y_id, stride)
+            y = self.y_sep_conv_5(y, y_id, stride, bn_train=bn_train)
         elif y_op == 2:
             y = self.y_avg_pool(y, stride)
         elif y_op == 3:
@@ -79,9 +79,9 @@ class Node(nn.Module):
             if stride > 1:
                 assert stride == 2
                 if y_id == 0:
-                    y = self.x_id_reduce_1(y)
+                    y = self.x_id_reduce_1(y, bn_train=bn_train)
                 else:
-                    y = self.x_id_reduce_2(y)
+                    y = self.x_id_reduce_2(y, bn_train=bn_train)
          
         if x_op != 4 and self.drop_path_keep_prob is not None and self.training:
             x = apply_drop_path(x, self.drop_path_keep_prob, self.layer_id, self.layers, step, self.steps)
@@ -123,15 +123,15 @@ class Cell(nn.Module):
         
         self.out_shape = [out_hw, out_hw, channels]
         
-    def forward(self, s0, s1, arch, step):
-        s0, s1 = self.maybe_calibrate_size(s0, s1)
+    def forward(self, s0, s1, arch, step, bn_train=False):
+        s0, s1 = self.maybe_calibrate_size(s0, s1, bn_train=bn_train)
         states = [s0, s1]
         used = [0] * (self.nodes + 2)
         for i in range(self.nodes):
             x_id, x_op, y_id, y_op = arch[4*i], arch[4*i+1], arch[4*i+2], arch[4*i+3]
             used[x_id] += 1
             used[y_id] += 1
-            out = self.ops[i](states[x_id], x_id, x_op, states[y_id], y_id, y_op, step)
+            out = self.ops[i](states[x_id], x_id, x_op, states[y_id], y_id, y_op, step, bn_train=bn_train)
             states.append(out)
         concat = []
         for i, c in enumerate(used):
@@ -145,7 +145,7 @@ class Cell(nn.Module):
             if 1 in concat:
                 states[1] = self.fac_2(states[1])
         out = torch.cat([states[i] for i in concat], dim=1)
-        out = self.final_combine_conv(out, concat)
+        out = self.final_combine_conv(out, concat, bn_train=bn_train)
         return out
     
 
@@ -176,9 +176,11 @@ class NASNetworkCIFAR(nn.Module):
         channels = self.channels
         self.cells = nn.ModuleList()
         for i in range(self.total_layers):
+            # normal cell
             if i not in self.pool_layers:
                 cell = Cell(outs, self.nodes, channels, False, i, self.total_layers, self.steps, self.drop_path_keep_prob)
                 outs = [outs[-1], cell.out_shape]
+            # reduction cell
             else:
                 channels *= 2
                 cell = Cell(outs, self.nodes, channels, True, i, self.total_layers, self.steps, self.drop_path_keep_prob)
@@ -208,18 +210,18 @@ class NASNetworkCIFAR(nn.Module):
             x.data.copy_(y.data)
         return model_new
     
-    def forward(self, input, arch, step=None):
+    def forward(self, input, arch, step=None, bn_train=False):
         aux_logits = None
         conv_arch, reduc_arch = arch
         s0 = s1 = self.stem(input)
         for i, cell in enumerate(self.cells):
             if cell.reduction:
                 assert i in self.pool_layers
-                s0, s1 = s1, cell(s0, s1, reduc_arch, step)
+                s0, s1 = s1, cell(s0, s1, reduc_arch, step, bn_train=bn_train)
             else:
-                s0, s1 = s1, cell(s0, s1, conv_arch, step)
+                s0, s1 = s1, cell(s0, s1, conv_arch, step, bn_train=bn_train)
             if self.use_aux_head and i == self.aux_head_index and self.training:
-                aux_logits = self.aux_head(s1)
+                aux_logits = self.aux_head(s1, bn_train=bn_train)
         out = self.relu(s1)
         out = self.global_pooling(out)
         out = self.dropout(out)

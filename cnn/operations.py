@@ -1,7 +1,7 @@
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-from torch.autograd import Variable
+from torch import Tensor
 
 INPLACE=False
 
@@ -21,7 +21,7 @@ def apply_drop_path(x, drop_path_keep_prob, layer_id, layers, step, steps):
     drop_path_keep_prob = 1.0 - step_ratio * (1.0 - drop_path_keep_prob)
     if drop_path_keep_prob < 1.:
         noise_shape = [x.size(0), 1, 1, 1]
-        mask = Variable(torch.cuda.FloatTensor(*noise_shape).bernoulli_(drop_path_keep_prob))
+        mask =torch.FloatTensor(*noise_shape).bernoulli_(drop_path_keep_prob)
         x.div_(drop_path_keep_prob)
         x.mul_(mask)
     return x
@@ -30,20 +30,28 @@ def apply_drop_path(x, drop_path_keep_prob, layer_id, layers, step, steps):
 class AuxHeadCIFAR(nn.Module):
     def __init__(self, C_in, classes):
         super(AuxHeadCIFAR, self).__init__()
-        self.ops = nn.Sequential(
-            nn.ReLU(inplace=INPLACE),
-            nn.AvgPool2d(5, stride=3, padding=0, count_include_pad=False),
-            nn.Conv2d(C_in, 128, 1, bias=False),
-            nn.BatchNorm2d(128),
-            nn.ReLU(inplace=INPLACE),
-            nn.Conv2d(128, 768, 2, bias=False),
-            nn.BatchNorm2d(768),
-            nn.ReLU(inplace=INPLACE),
-        )
+        self.relu1 = nn.ReLU(inplace=INPLACE)
+        self.avg_pool = nn.AvgPool2d(5, stride=3, padding=0, count_include_pad=False)
+        self.conv1 = nn.Conv2d(C_in, 128, 1, bias=False)
+        self.bn1 = nn.BatchNorm2d(128)
+        self.relu2 = nn.ReLU(inplace=INPLACE)
+        self.conv2 = nn.Conv2d(128, 768, 2, bias=False)
+        self.bn2 = nn.BatchNorm2d(768)
+        self.relu3 = nn.ReLU(inplace=INPLACE)
         self.classifier = nn.Linear(768, classes)
         
-    def forward(self, x):
-        x = self.ops(x)
+    def forward(self, x, bn_train=False):
+        if bn_train:
+            self.bn1.train()
+            self.bn2.train()
+        x = self.relu1(x)
+        x = self.avg_pool(x)
+        x = self.conv1(x)
+        x = self.bn1(x)
+        x = self.relu2(x)
+        x = self.conv2(x)
+        x = self.bn2(x)
+        x = self.relu3(x)
         x = self.classifier(x.view(x.size(0), -1))
         return x
 
@@ -52,20 +60,28 @@ class AuxHeadImageNet(nn.Module):
     def __init__(self, C_in, classes):
         """input should be in [B, C, 14, 14]"""
         super(AuxHeadImageNet, self).__init__()
-        self.ops = nn.Sequential(
-            nn.ReLU(inplace=INPLACE),
-            nn.AvgPool2d(5, stride=2, padding=0, count_include_pad=False),
-            nn.Conv2d(C_in, 128, 1, bias=False),
-            nn.BatchNorm2d(128),
-            nn.ReLU(inplace=INPLACE),
-            nn.Conv2d(128, 768, 2, bias=False),
-            nn.BatchNorm2d(768),
-            nn.ReLU(inplace=INPLACE),
-        )
+        self.relu1 = nn.ReLU(inplace=INPLACE)
+        self.avg_pool = nn.AvgPool2d(5, stride=2, padding=0, count_include_pad=False)
+        self.conv1 = nn.Conv2d(C_in, 128, 1, bias=False)
+        self.bn1 = nn.BatchNorm2d(128)
+        self.relu2 = nn.ReLU(inplace=INPLACE)
+        self.conv2 = nn.Conv2d(128, 768, 2, bias=False)
+        self.bn2 = nn.BatchNorm2d(768)
+        self.relu3 = nn.ReLU(inplace=INPLACE)
         self.classifier = nn.Linear(768, classes)
     
-    def forward(self, x):
-        x = self.ops(x)
+    def forward(self, x, bn_train=False):
+        if bn_train:
+            self.bn1.train()
+            self.bn2.train()
+        x = self.relu1(x)
+        x = self.avg_pool(x)
+        x = self.conv1(x)
+        x = self.bn1(x)
+        x = self.relu2(x)
+        x = self.conv2(x)
+        x = self.bn2(x)
+        x = self.relu3(x)
         x = self.classifier(x.view(x.size(0), -1))
         return x
 
@@ -73,14 +89,17 @@ class AuxHeadImageNet(nn.Module):
 class ReLUConvBN(nn.Module):
     def __init__(self, C_in, C_out, kernel_size, stride, padding, affine=True):
         super(ReLUConvBN, self).__init__()
-        self.op = nn.Sequential(
-            nn.ReLU(inplace=INPLACE),
-            nn.Conv2d(C_in, C_out, kernel_size, stride=stride, padding=padding, bias=False),
-            nn.BatchNorm2d(C_out, affine=affine)
-        )
+        self.relu = nn.ReLU(inplace=INPLACE)
+        self.conv = nn.Conv2d(C_in, C_out, kernel_size, stride=stride, padding=padding, bias=False)
+        self.bn = nn.BatchNorm2d(C_out, affine=affine)
     
-    def forward(self, x):
-        return self.op(x)
+    def forward(self, x, bn_train=False):
+        x = self.relu(x)
+        x = self.conv(x)
+        if bn_train:
+            self.bn.train()
+        x = self.bn(x)
+        return x
 
 
 class WSReLUConvBN(nn.Module):
@@ -92,10 +111,12 @@ class WSReLUConvBN(nn.Module):
         self.w = nn.ParameterList([nn.Parameter(torch.Tensor(C_out, C_in, kernel_size, kernel_size)) for _ in range(num_possible_inputs)])
         self.bn = nn.BatchNorm2d(C_out, affine=True)
     
-    def forward(self, x, x_id):
+    def forward(self, x, x_id, bn_train=False):
         x = self.relu(x)
         w = torch.cat([self.w[i] for i in x_id], dim=1)
         x = F.conv2d(x, w, stride=self.stride, padding=self.padding)
+        if bn_train:
+            self.bn.train()
         x = self.bn(x)
         return x
 
@@ -127,10 +148,13 @@ class WSBN(nn.Module):
                 self.weight[i].data.uniform_()
                 self.bias[i].data.zero_()
 
-    def forward(self, x, x_id):
+    def forward(self, x, x_id, bn_train=False):
+        training = self.training
+        if bn_train:
+            training = True
         return F.batch_norm(
             x, self.running_mean, self.running_var, self.weight[x_id], self.bias[x_id],
-            self.training, self.momentum, self.eps)
+            training, self.momentum, self.eps)
 
     def __repr__(self):
         return ('{name}({num_features}, eps={eps}, momentum={momentum},'
@@ -173,16 +197,16 @@ class WSSepConv(nn.Module):
         self.W2_pointwise = nn.ParameterList([nn.Parameter(torch.Tensor(C_out, C_in, 1, 1)) for i in range(num_possible_inputs)])
         self.bn2 = WSBN(num_possible_inputs, C_in, affine=affine)
     
-    def forward(self, x, x_id, stride=1):
+    def forward(self, x, x_id, stride=1, bn_train=False):
         x = self.relu1(x)
         x = F.conv2d(x, self.W1_depthwise[x_id], stride=stride, padding=self.padding, groups=self.C_in)
         x = F.conv2d(x, self.W1_pointwise[x_id], padding=0)
-        x = self.bn1(x, x_id)
+        x = self.bn1(x, x_id, bn_train=bn_train)
 
         x = self.relu2(x)
         x = F.conv2d(x, self.W2_depthwise[x_id], padding=self.padding, groups=self.C_in)
         x = F.conv2d(x, self.W2_pointwise[x_id], padding=0)
-        x = self.bn2(x, x_id)
+        x = self.bn2(x, x_id, bn_train=bn_train)
         return x
 
 
@@ -224,10 +248,12 @@ class FactorizedReduce(nn.Module):
                                    nn.Conv2d(C_in, C_out // 2, 1, bias=False))
         self.bn = nn.BatchNorm2d(C_out, affine=affine)
     
-    def forward(self, x):
+    def forward(self, x, bn_train=False):
         path1 = x
         path2 = F.pad(x, (0, 1, 0, 1), "constant", 0)[:, :, 1:, 1:]
         out = torch.cat([self.path1(path1), self.path2(path2)], dim=1)
+        if bn_train:
+            self.bn.train()
         out = self.bn(out)
         return out
 
@@ -254,11 +280,11 @@ class MaybeCalibrateSize(nn.Module):
             
         self.out_shape = [x_out_shape, y_out_shape]
     
-    def forward(self, s0, s1):
+    def forward(self, s0, s1, bn_train=False):
         if s0.size(2) != s1.size(2) or s0.size(1) != self.channels:
-            s0 = self.preprocess_x(s0)
+            s0 = self.preprocess_x(s0, bn_train)
         if s1.size(1) != self.channels:
-            s1 = self.preprocess_y(s1)
+            s1 = self.preprocess_y(s1, bn_train)
         return [s0, s1]
 
 
@@ -278,10 +304,10 @@ class FinalCombine(nn.Module):
                     self.concat_fac_op_dict[i] = len(self.ops)
                     self.ops.append(FactorizedReduce(layer[-1], channels, affine))
         
-    def forward(self, states):
+    def forward(self, states, bn_train=False):
         for i, state in enumerate(states):
             if i in self.concat:
                 if i in self.concat_fac_op_dict:
-                    states[i] = self.ops[self.concat_fac_op_dict[i]](state)
+                    states[i] = self.ops[self.concat_fac_op_dict[i]](state, bn_train)
         out = torch.cat([states[i] for i in self.concat], dim=1)
         return out
