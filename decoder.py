@@ -3,7 +3,6 @@ import numpy as np
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-from torch.autograd import Variable
 
 INITRANGE = 0.04
 SOS_ID = 0
@@ -156,9 +155,7 @@ class Decoder(nn.Module):
         
         # set default input and max decoding length
         if x is None:
-            x = Variable(torch.LongTensor([self.sos_id] * batch_size).view(batch_size, 1))
-            if torch.cuda.is_available():
-                x = x.cuda()
+            x = torch.LongTensor([self.sos_id] * batch_size).view(batch_size, 1).cuda().requires_grad_()
             max_length = self.length
         else:
             max_length = x.size(1)

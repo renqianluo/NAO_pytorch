@@ -538,11 +538,14 @@ def main():
         new_archs = list(map(lambda x: utils.parse_seq_to_arch(x, 2), new_archs))  # [[[conv],[reduc]]]
         num_new_archs = len(new_archs)
         logging.info("Generate %d new archs", num_new_archs)
+        # replace bottom archs
         if args.controller_replace:
             new_arch_pool = old_archs[:len(old_archs) - (num_new_archs + args.controller_random_arch)] + \
                             new_archs + utils.generate_arch(args.controller_random_arch, 5, 5)
+        # discard all archs except top k
         elif args.controller_discard:
             new_arch_pool = old_archs[:100] + new_archs + utils.generate_arch(args.controller_random_arch, 5, 5)
+        # use all
         else:
             new_arch_pool = old_archs + new_archs + utils.generate_arch(args.controller_random_arch, 5, 5)
         logging.info("Totally %d architectures now to train", len(new_arch_pool))

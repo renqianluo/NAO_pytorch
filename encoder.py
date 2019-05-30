@@ -34,8 +34,7 @@ class Encoder(nn.Module):
         self.mlp_hidden_size = mlp_hidden_size
         
         self.embedding = nn.Embedding(self.vocab_size, self.emb_size)
-        self.rnn = nn.LSTM(self.hidden_size, self.hidden_size, self.layers, batch_first=True,
-                           dropout=dropout)
+        self.rnn = nn.LSTM(self.hidden_size, self.hidden_size, self.layers, batch_first=True, dropout=dropout)
         self.mlp = nn.Sequential()
         for i in range(self.mlp_layers):
             if i == 0:

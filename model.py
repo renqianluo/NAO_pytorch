@@ -175,7 +175,7 @@ class NASNetworkCIFAR(nn.Module):
             if self.use_aux_head and i == self.aux_head_index:
                 self.auxiliary_head = AuxHeadCIFAR(outs[-1][-1], classes)
         
-        self.relu = nn.ReLU(inplace=False)
+        #self.relu = nn.ReLU(inplace=False)
         self.global_pooling = nn.AdaptiveAvgPool2d(1)
         self.dropout = nn.Dropout(1 - self.keep_prob)
         self.classifier = nn.Linear(outs[-1][-1], 10)
@@ -194,7 +194,8 @@ class NASNetworkCIFAR(nn.Module):
             s0, s1 = s1, cell(s0, s1, step)
             if self.use_aux_head and i == self.aux_head_index and self.training:
                 aux_logits = self.auxiliary_head(s1)
-        out = self.relu(s1)
+        out = s1
+        #out = self.relu(s1)
         out = self.global_pooling(out)
         out = self.dropout(out)
         logits = self.classifier(out.view(out.size(0), -1))
@@ -220,7 +221,7 @@ class NASNetworkImageNet(nn.Module):
         self.layers = self.layers * 3
         
         if self.use_aux_head:
-            self.aux_head_index = self.pool_layers[-1]  # + 1
+            self.aux_head_index = self.pool_layers[-1]
 
         channels = self.channels
         self.stem0 = nn.Sequential(
@@ -254,7 +255,7 @@ class NASNetworkImageNet(nn.Module):
             if self.use_aux_head and i == self.aux_head_index:
                 self.auxiliary_head = AuxHeadImageNet(outs[-1][-1], classes)
         
-        self.relu = nn.ReLU(inplace=False)
+        #self.relu = nn.ReLU(inplace=False)
         self.global_pooling = nn.AdaptiveAvgPool2d(1)
         self.dropout = nn.Dropout(1 - self.keep_prob)
         self.classifier = nn.Linear(outs[-1][-1], 10)
@@ -274,7 +275,9 @@ class NASNetworkImageNet(nn.Module):
             s0, s1 = s1, cell(s0, s1, step)
             if self.use_aux_head and i == self.aux_head_index and self.training:
                 aux_logits = self.auxiliary_head(s1)
-        out = self.relu(s1)
+        
+        out = s1
+        #out = self.relu(s1)
         out = self.global_pooling(out)
         out = self.dropout(out)
         logits = self.classifier(out.view(out.size(0), -1))
