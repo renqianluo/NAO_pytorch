@@ -2,7 +2,7 @@ import logging
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-from operations import *
+from operations import WSAvgPool2d, WSMaxPool2d, WSReLUConvBN, WSBN, WSSepConv, FactorizedReduce, MaybeCalibrateSize, AuxHeadCIFAR, AuxHeadImageNet， apply_drop_path
 
 
 class Node(nn.Module):
@@ -188,9 +188,9 @@ class NASNetworkCIFAR(nn.Module):
             self.cells.append(cell)
             
             if self.use_aux_head and i == self.aux_head_index:
-                self.aux_head = AuxHeadCIFAR(outs[-1][-1], classes)
+                self.auxiliary_head = AuxHeadCIFAR(outs[-1][-1], classes)
 
-        self.relu = nn.ReLU(inplace=False)
+        #self.relu = nn.ReLU(inplace=False)
         self.global_pooling = nn.AdaptiveAvgPool2d(1)
         self.dropout = nn.Dropout(1 - self.keep_prob)
         self.classifier = nn.Linear(outs[-1][-1], classes)
@@ -221,8 +221,9 @@ class NASNetworkCIFAR(nn.Module):
             else:
                 s0, s1 = s1, cell(s0, s1, conv_arch, step, bn_train=bn_train)
             if self.use_aux_head and i == self.aux_head_index and self.training:
-                aux_logits = self.aux_head(s1, bn_train=bn_train)
-        out = self.relu(s1)
+                aux_logits = self.auxiliary_head(s1, bn_train=bn_train)
+        out = s1
+        #out = self.relu(s1)
         out = self.global_pooling(out)
         out = self.dropout(out)
         logits = self.classifier(out.view(out.size(0), -1))
@@ -277,9 +278,9 @@ class NASNetworkImageNet(nn.Module):
             self.cells.append(cell)
             
             if self.use_aux_head and i == self.aux_head_index:
-                self.aux_head = AuxHeadImageNet(outs[-1][-1], classes)
+                self.auxiliary_head = AuxHeadImageNet(outs[-1][-1], classes)
         
-        self.relu = nn.ReLU(inplace=False)
+        #self.relu = nn.ReLU(inplace=False)
         self.global_pooling = nn.AdaptiveAvgPool2d(1)
         self.dropout = nn.Dropout(1 - self.keep_prob)
         self.classifier = nn.Linear(outs[-1][-1], classes)
@@ -299,7 +300,7 @@ class NASNetworkImageNet(nn.Module):
             x.data.copy_(y.data)
         return model_new
     
-    def forward(self, input, arch, step=None):
+    def forward(self, input, arch, step=None, bn_train=bn_train):
         aux_logits = None
         conv_arch, reduc_arch = arch
         s0 = self.stem0(input)
@@ -307,12 +308,13 @@ class NASNetworkImageNet(nn.Module):
         for i, cell in enumerate(self.cells):
             if cell.reduction:
                 assert i in self.pool_layers
-                s0, s1 = s1, cell(s0, s1, reduc_arch, step)
+                s0, s1 = s1, cell(s0, s1, reduc_arch, step, bn_train=bn_train)
             else:
-                s0, s1 = s1, cell(s0, s1, conv_arch, step)
+                s0, s1 = s1, cell(s0, s1, conv_arch, step, bn_train=bn_train)
             if self.use_aux_head and i == self.aux_head_index and self.training:
-                aux_logits = self.aux_head(s1)
-        out = self.relu(s1)
+                aux_logits = self.auxiliary_head(s1, bn_train=bn_train)
+        out = s1
+        #out = self.relu(s1)
         out = self.global_pooling(out)
         out = self.dropout(out)
         logits = self.classifier(out.view(out.size(0), -1))

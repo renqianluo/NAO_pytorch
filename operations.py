@@ -5,14 +5,6 @@ from torch import Tensor
 
 INPLACE=False
 
-OPERATIONS = {
-    0: lambda C, stride, affine: SepConv(C, C, 3, stride, 1, affine=affine), # sep conv 3 x 3
-    1: lambda C, stride, affine: SepConv(C, C, 5, stride, 2, affine=affine), # sep conv 5 x 5
-    2: lambda C, stride, affine: nn.AvgPool2d(3, stride=stride, padding=1, count_include_pad=False), # avg pool 3 x 3
-    3: lambda C, stride, affine: nn.MaxPool2d(3, stride=stride, padding=1), # max pool 3x 3
-    4: lambda C, stride, affine: Identity(), # identity
-}
-
 
 def apply_drop_path(x, drop_path_keep_prob, layer_id, layers, step, steps):
     layer_ratio = float(layer_id+1) / (layers)
@@ -145,7 +137,7 @@ class WSBN(nn.Module):
         self.running_var.fill_(1)
         if self.affine:
             for i in range(self.num_possible_inputs):
-                self.weight[i].data.uniform_()
+                self.weight[i].data.fill_(1)
                 self.bias[i].data.zero_()
 
     def forward(self, x, x_id, bn_train=False):
@@ -249,11 +241,11 @@ class FactorizedReduce(nn.Module):
         self.bn = nn.BatchNorm2d(C_out, affine=affine)
     
     def forward(self, x, bn_train=False):
+        if bn_train:
+            self.bn.train()
         path1 = x
         path2 = F.pad(x, (0, 1, 0, 1), "constant", 0)[:, :, 1:, 1:]
         out = torch.cat([self.path1(path1), self.path2(path2)], dim=1)
-        if bn_train:
-            self.bn.train()
         out = self.bn(out)
         return out
 
@@ -267,9 +259,11 @@ class MaybeCalibrateSize(nn.Module):
         
         x_out_shape = [hw[0], hw[0], c[0]]
         y_out_shape = [hw[1], hw[1], c[1]]
+        # previous reduction cell
         if hw[0] != hw[1]:
             assert hw[0] == 2 * hw[1]
-            self.preprocess_x = nn.Sequential(nn.ReLU(inplace=INPLACE), FactorizedReduce(c[0], channels, affine))
+            self.relu = nn.ReLU(inplace=INPLACE)
+            self.preprocess_x = FactorizedReduce(c[0], channels, affine)
             x_out_shape = [hw[1], hw[1], channels]
         elif c[0] != channels:
             self.preprocess_x = ReLUConvBN(c[0], channels, 1, 1, 0, affine)
@@ -281,10 +275,13 @@ class MaybeCalibrateSize(nn.Module):
         self.out_shape = [x_out_shape, y_out_shape]
     
     def forward(self, s0, s1, bn_train=False):
-        if s0.size(2) != s1.size(2) or s0.size(1) != self.channels:
-            s0 = self.preprocess_x(s0, bn_train)
+        if s0.size(2) != s1.size(2):
+            s0 = self.relu(s0)
+            s0 = self.preprocess_x(s0, bn_train=bn_train)
+        elif s0.size(1) != self.channels:
+            s0 = self.preprocess_x(s0, bn_train=bn_train)
         if s1.size(1) != self.channels:
-            s1 = self.preprocess_y(s1, bn_train)
+            s1 = self.preprocess_y(s1, bn_train=bn_train)
         return [s0, s1]
 
 
@@ -300,7 +297,7 @@ class FinalCombine(nn.Module):
             if i in concat:
                 hw = layer[0]
                 if hw > out_hw:
-                    assert hw == 2 * out_hw
+                    assert hw == 2 * out_hw and i in [0,1]
                     self.concat_fac_op_dict[i] = len(self.ops)
                     self.ops.append(FactorizedReduce(layer[-1], channels, affine))
         
@@ -311,3 +308,12 @@ class FinalCombine(nn.Module):
                     states[i] = self.ops[self.concat_fac_op_dict[i]](state, bn_train)
         out = torch.cat([states[i] for i in self.concat], dim=1)
         return out
+
+
+OPERATIONS = {
+    0: SepConv,
+    1: SepConv,
+    2: nn.AvgPool2d,
+    3: nn.MaxPool2d,
+    4: nn.Identity,
+}

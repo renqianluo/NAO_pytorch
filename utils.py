@@ -7,7 +7,6 @@ import torch
 import torch.nn as nn
 import torch.utils.data
 import torchvision.transforms as transforms
-from torch.autograd import Variable
 
 B=5
 

@@ -52,8 +52,8 @@ def train(train_queue, model, optimizer, global_step, criterion):
     top5 = utils.AvgrageMeter()
     model.train()
     for step, (input, target) in enumerate(train_queue):
-        input = Variable(input).cuda()
-        target = Variable(target).cuda(async=True)
+        input = torch.tensor(input, requires_grad=True).cuda()
+        target = torch.tensor(target, requires_grad=True).cuda()
     
         optimizer.zero_grad()
         logits, aux_logits = model(input, global_step)
@@ -82,23 +82,23 @@ def valid(valid_queue, model, criterion):
     objs = utils.AvgrageMeter()
     top1 = utils.AvgrageMeter()
     top5 = utils.AvgrageMeter()
-    model.eval()
-
-    for step, (input, target) in enumerate(valid_queue):
-        input = Variable(input, volatile=True).cuda()
-        target = Variable(target, volatile=True).cuda(async=True)
-    
-        logits, _ = model(input)
-        loss = criterion(logits, target)
-    
-        prec1, prec5 = utils.accuracy(logits, target, topk=(1, 5))
-        n = input.size(0)
-        objs.update(loss.data[0], n)
-        top1.update(prec1.data[0], n)
-        top5.update(prec5.data[0], n)
-    
-        if step % 100 == 0:
-            logging.info('valid %03d %e %f %f', step, objs.avg, top1.avg, top5.avg)
+    with torch.no_grad():
+        model.eval()
+        for step, (input, target) in enumerate(valid_queue):
+            input = torch.tensor(input).cuda()
+            target = torch.tensor(target).cuda()
+        
+            logits, _ = model(input)
+            loss = criterion(logits, target)
+        
+            prec1, prec5 = utils.accuracy(logits, target, topk=(1, 5))
+            n = input.size(0)
+            objs.update(loss.data[0], n)
+            top1.update(prec1.data[0], n)
+            top5.update(prec5.data[0], n)
+        
+            if step % 100 == 0:
+                logging.info('valid %03d %e %f %f', step, objs.avg, top1.avg, top5.avg)
 
     return top1.avg, objs.avg
 

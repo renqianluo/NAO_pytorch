@@ -6,7 +6,7 @@ import logging
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-from operations import *
+from operations import OPERATIONS, ReLUConvBN, MaybeCalibrateSize, FactorizedReduce, AuxHeadCIFAR, AuxHeadImageNet, apply_drop_path, FinalCombine
 from torch import Tensor
 import utils
     
@@ -27,44 +27,44 @@ class Node(nn.Module):
         y_shape = list(y_shape)
         
         x_stride = stride if x_id in [0, 1] else 1
-        if x_op in [0, 1]:
-            self.x_op = nn.Sequential(OPERATIONS[x_op](channels, x_stride, True))
+        if x_op == 0:
+            self.x_op = OPERATIONS[x_op](channels, channels, 3, x_stride, 1)
             x_shape = [x_shape[0] // x_stride, x_shape[1] // x_stride, channels]
-        elif x_op in [2, 3]:
-            self.x_op = nn.Sequential(OPERATIONS[x_op](channels, x_stride, True))
+        elif x_op == 1:
+            self.x_op = OPERATIONS[x_op](channels, channels, 5, x_stride, 2)
+            x_shape = [x_shape[0] // x_stride, x_shape[1] // x_stride, channels]
+        elif x_op == 2:
+            self.x_op = OPERATIONS[x_op](3, stride=x_stride, padding=1, count_include_pad=False)
             x_shape = [x_shape[0] // x_stride, x_shape[1] // x_stride, x_shape[-1]]
-            if x_shape[-1] != channels:
-                self.x_op.add_module('pool_conv', ReLUConvBN(x[-1], channels, 1, 1, 0))
-                x_shape = [x_shape[0], x_shape[1], channels]
-        else:
-            self.x_op = nn.Sequential(OPERATIONS[x_op](channels, x_stride, True))
+        elif x_op == 3:
+            self.x_op = OPERATIONS[x_op](3, stride=x_stride, padding=1)
+            x_shape = [x_shape[0] // x_stride, x_shape[1] // x_stride, x_shape[-1]]
+        elif x_op == 4:
+            self.x_op = OPERATIONS[x_op]()
             if x_stride > 1:
                 assert x_stride == 2
                 self.x_op.add_module('id_fact_reduce', FactorizedReduce(x_shape[-1], channels))
                 x_shape = [x_shape[0] // x_stride, x_shape[1] // x_stride, channels]
-            if x_shape[-1] != channels:
-                self.x_op.add_module('id_conv', ReLUConvBN(x[-1], channels, 1, 1, 0))
-                x_shape = [x_shape[0], x_shape[1], channels]
         
         y_stride = stride if y_id in [0, 1] else 1
-        if y_op in [0, 1]:
-            self.y_op = nn.Sequential(OPERATIONS[y_op](channels, y_stride, True))
+        if y_op == 0:
+            self.y_op = OPERATIONS[y_op](channels, channels, 3, y_stride, 1)
             y_shape = [y_shape[0] // y_stride, y_shape[1] // y_stride, channels]
-        elif y_op in [2, 3]:
-            self.y_op = nn.Sequential(OPERATIONS[y_op](channels, y_stride, True))
+        elif y_op == 1:
+            self.y_op = OPERATIONS[y_op](channels, channels, 5, y_stride, 2)
+            y_shape = [y_shape[0] // y_stride, y_shape[1] // y_stride, channels]
+        elif y_op == 2:
+            self.y_op = OPERATIONS[y_op](3, stride=y_stride, padding=1, count_include_pad=False)
             y_shape = [y_shape[0] // y_stride, y_shape[1] // y_stride, y_shape[-1]]
-            if y_shape[-1] != channels:
-                self.y_op.add_module('pool_conv', ReLUConvBN(y[-1], channels, 1, 1, 0))
-                y_shape = [y_shape[0], y_shape[1], channels]
-        else:
-            self.y_op = nn.Sequential(OPERATIONS[y_op](channels, y_stride, True))
+        elif y_op == 3:
+            self.y_op = OPERATIONS[y_op](3, stride=y_stride, padding=1)
+            y_shape = [y_shape[0] // y_stride, y_shape[1] // y_stride, y_shape[-1]]
+        elif y_op == 4:
+            self.y_op = OPERATIONS[y_op]()
             if y_stride > 1:
                 assert y_stride == 2
                 self.y_op.add_module('id_fact_reduce', FactorizedReduce(y_shape[-1], channels))
                 y_shape = [y_shape[0] // y_stride, y_shape[1] // y_stride, channels]
-            if y_shape[-1] != channels:
-                self.y_op.add_module('id_conv', ReLUConvBN(y[-1], channels, 1, 1, 0))
-                y_shape = [y_shape[0], y_shape[1], channels]
         
         assert x_shape[0] == y_shape[0] and x_shape[1] == y_shape[1]
         self.out_shape = list(x_shape)
@@ -173,7 +173,7 @@ class NASNetworkCIFAR(nn.Module):
             outs = [outs[-1], cell.out_shape]
             
             if self.use_aux_head and i == self.aux_head_index:
-                self.aux_head = AuxHeadCIFAR(outs[-1][-1], classes)
+                self.auxiliary_head = AuxHeadCIFAR(outs[-1][-1], classes)
         
         self.relu = nn.ReLU(inplace=False)
         self.global_pooling = nn.AdaptiveAvgPool2d(1)
@@ -193,7 +193,7 @@ class NASNetworkCIFAR(nn.Module):
         for i, cell in enumerate(self.cells):
             s0, s1 = s1, cell(s0, s1, step)
             if self.use_aux_head and i == self.aux_head_index and self.training:
-                aux_logits = self.aux_head(s1)
+                aux_logits = self.auxiliary_head(s1)
         out = self.relu(s1)
         out = self.global_pooling(out)
         out = self.dropout(out)
@@ -252,7 +252,7 @@ class NASNetworkImageNet(nn.Module):
             outs = [outs[-1], cell.out_shape]
             
             if self.use_aux_head and i == self.aux_head_index:
-                self.aux_head = AuxHeadImageNet(outs[-1][-1], classes)
+                self.auxiliary_head = AuxHeadImageNet(outs[-1][-1], classes)
         
         self.relu = nn.ReLU(inplace=False)
         self.global_pooling = nn.AdaptiveAvgPool2d(1)
@@ -273,7 +273,7 @@ class NASNetworkImageNet(nn.Module):
         for i, cell in enumerate(self.cells):
             s0, s1 = s1, cell(s0, s1, step)
             if self.use_aux_head and i == self.aux_head_index and self.training:
-                aux_logits = self.aux_head(s1)
+                aux_logits = self.auxiliary_head(s1)
         out = self.relu(s1)
         out = self.global_pooling(out)
         out = self.dropout(out)

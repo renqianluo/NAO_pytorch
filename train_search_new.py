@@ -14,9 +14,7 @@ import torch.nn.functional as F
 import torchvision.datasets as dset
 import torchvision.transforms as transforms
 import torch.backends.cudnn as cudnn
-from torch.autograd import Variable
 from model_search import NASNetworkCIFAR, NASNetworkImageNet
-from calculate_params import calculate_params
 from controller import NAO
 
 parser = argparse.ArgumentParser(description='NAO CIFAR-10')
@@ -26,7 +24,7 @@ parser.add_argument('--mode', type=str, default='train', choices=['train', 'test
 parser.add_argument('--data_path', type=str, default='./data')
 parser.add_argument('--dataset', type=str, default='cifar10', choices=['cifar10, cifar100, imagenet'])
 parser.add_argument('--zip_file', action='store_true', default=False)
-parser.add_argument('--preload', action='store_true', default=False)
+parser.add_argument('--lazy_load', action='store_true', default=False)
 parser.add_argument('--output_dir', type=str, default='models')
 parser.add_argument('--seed', type=int, default=None)
 parser.add_argument('--child_sample_policy', type=str, default=None)
@@ -118,8 +116,9 @@ def build_cifar10(model_state_dict, optimizer_state_dict, **kwargs):
     train_data = dset.CIFAR10(root=args.data_path, train=True, download=True, transform=train_transform)
     
     num_train = len(train_data)
-    indices = list(range(num_train))
+    indices = list(range(num_train))    
     split = int(np.floor(ratio * num_train))
+    np.random.shuffle(indices)
 
     train_queue = torch.utils.data.DataLoader(
         train_data, batch_size=args.child_batch_size,
@@ -158,8 +157,9 @@ def build_cifar100(model_state_dict, optimizer_state_dict, **kwargs):
     train_data = dset.CIFAR100(root=args.data_path, train=True, download=True, transform=train_transform)
 
     num_train = len(train_data)
-    indices = list(range(num_train))
+    indices = list(range(num_train))    
     split = int(np.floor(ratio * num_train))
+    np.random.shuffle(indices)
 
     train_queue = torch.utils.data.DataLoader(
         train_data, batch_size=args.child_batch_size,
@@ -214,19 +214,19 @@ def build_imagenet(model_state_dict, optimizer_state_dict, **kwargs):
     if args.zip_file:
         logging.info('Loading data from zip file')
         traindir = os.path.join(args.data, 'train.zip')
-        if args.preload:
+        if args.lazy_load:
+            train_data = utils.ZipDataset(traindir, train_transform)
+        else:
             logging.info('Loading data into memory')
             train_data = utils.InMemoryZipDataset(traindir, train_transform, num_workers=32)
-        else:
-            train_data = utils.ZipDataset(traindir, train_transform)
     else:
         logging.info('Loading data from directory')
         traindir = os.path.join(args.data, 'train')
-        if args.preload:
+        if args.lazy_load:
+            train_data = dset.ImageFolder(traindir, train_transform)
+        else:
             logging.info('Loading data into memory')
             train_data = utils.InMemoryDataset(traindir, train_transform, num_workers=32)
-        else:
-            train_data = dset.ImageFolder(traindir, train_transform)
        
     num_train = len(train_data)
     indices = list(range(num_train))
@@ -271,12 +271,15 @@ def child_train(train_queue, model, optimizer, global_step, arch_pool, arch_pool
     top5 = utils.AvgrageMeter()
     model.train()
     for step, (input, target) in enumerate(train_queue):
-        input = Variable(input).cuda()
-        target = Variable(target).cuda(async=True)
-        
+        input = torch.tensor(input, requires_grad=True).cuda()
+        target = torch.tensor(target, requires_grad=True).cuda()
+
         optimizer.zero_grad()
         # sample an arch to train
-        arch = utils.sample_arch(arch_pool, arch_pool_prob)
+        if arch_pool is None:
+            arch = utils.generate_arch(1, args.child_nodes, 5)  # [[[conv],[reduc]]]
+        else:
+            arch = utils.sample_arch(arch_pool, arch_pool_prob)
         logits, aux_logits = model(input, arch, global_step)
         global_step += 1
         loss = criterion(logits, target)
@@ -302,21 +305,22 @@ def child_train(train_queue, model, optimizer, global_step, arch_pool, arch_pool
 
 def child_valid(valid_queue, model, arch_pool, criterion):
     valid_acc_list = []
-    for i, arch in enumerate(arch_pool):
+    with torch.no_grad():
         model.eval()
-        # for step, (input, target) in enumerate(valid_queue):
-        inputs, targets = next(iter(valid_queue))
-        inputs = Variable(inputs, volatile=True).cuda()
-        targets = Variable(targets, volatile=True).cuda(async=True)
+        for i, arch in enumerate(arch_pool):
+            # for step, (input, target) in enumerate(valid_queue):
+            inputs, targets = next(iter(valid_queue))
+            inputs = torch.tensor(inputs).cuda()
+            targets = torch.tensor(targets).cuda()
+                
+            logits, _ = model(inputs, arch, bn_train=True)
+            loss = criterion(logits, targets)
+                
+            prec1, prec5 = utils.accuracy(logits, targets, topk=(1, 5))
+            valid_acc_list.append(prec1.data[0]/100)
             
-        logits, _ = model(inputs, arch)
-        loss = criterion(logits, targets)
-            
-        prec1, prec5 = utils.accuracy(logits, targets, topk=(1, 5))
-        valid_acc_list.append(prec1.data[0]/100)
-        
-        if (i+1) % 100 == 0:
-            logging.info('Valid arch %s\n loss %.2f top1 %f top5 %f', ' '.join(map(str, arch[0] + arch[1])), loss, prec1, prec5)
+            if (i+1) % 100 == 0:
+                logging.info('Valid arch %s\n loss %.2f top1 %f top5 %f', ' '.join(map(str, arch[0] + arch[1])), loss, prec1, prec5)
         
     return valid_acc_list
 
@@ -332,10 +336,10 @@ def nao_train(train_queue, model, optimizer):
         decoder_input = sample['decoder_input']
         decoder_target = sample['decoder_target']
         
-        encoder_input = Variable(encoder_input).cuda()
-        encoder_target = Variable(encoder_target).cuda(async=True)
-        decoder_input = Variable(decoder_input).cuda()
-        decoder_target = Variable(decoder_target).cuda(async=True)
+        encoder_input = torch.tensor(encoder_input, requires_grad=True).cuda()
+        encoder_target = torch.tensor(encoder_target, requires_grad=True).cuda()
+        decoder_input = torch.tensor(decoder_input, requires_grad=True).cuda()
+        decoder_target = torch.tensor(decoder_target, requires_grad=True).cuda()
         
         optimizer.zero_grad()
         predict_value, log_prob, arch = model(encoder_input, decoder_input)
@@ -357,22 +361,23 @@ def nao_train(train_queue, model, optimizer):
 def nao_valid(queue, model):
     pa = utils.AvgrageMeter()
     hs = utils.AvgrageMeter()
-    model.eval()
-    for step, sample in enumerate(queue):
-        encoder_input = sample['encoder_input']
-        encoder_target = sample['encoder_target']
-        decoder_target = sample['decoder_target']
-        
-        encoder_input = Variable(encoder_input, volatile=True).cuda()
-        encoder_target = Variable(encoder_target, volatile=True).cuda(async=True)
-        decoder_target = Variable(decoder_target, volatile=True).cuda(async=True)
-        
-        predict_value, logits, arch = model(encoder_input)
-        n = encoder_input.size(0)
-        pairwise_acc = utils.pairwise_accuracy(encoder_target.data.squeeze().tolist(), predict_value.data.squeeze().tolist())
-        hamming_dis = utils.hamming_distance(decoder_target.data.squeeze().tolist(), arch.data.squeeze().tolist())
-        pa.update(pairwise_acc, n)
-        hs.update(hamming_dis, n)
+    with torch.no_grad():
+        model.eval()
+        for step, sample in enumerate(queue):
+            encoder_input = sample['encoder_input']
+            encoder_target = sample['encoder_target']
+            decoder_target = sample['decoder_target']
+            
+            encoder_input = torch.tensor(encoder_input, requires_grad=False).cuda()
+            encoder_target = torch.tensor(encoder_target, requires_grad=False).cuda()
+            decoder_target = torch.tensor(decoder_target, requires_grad=False).cuda()
+            
+            predict_value, logits, arch = model(encoder_input)
+            n = encoder_input.size(0)
+            pairwise_acc = utils.pairwise_accuracy(encoder_target.data.squeeze().tolist(), predict_value.data.squeeze().tolist())
+            hamming_dis = utils.hamming_distance(decoder_target.data.squeeze().tolist(), arch.data.squeeze().tolist())
+            pa.update(pairwise_acc, n)
+            hs.update(hamming_dis, n)
     return pa.avg, hs.avg
 
 
@@ -381,7 +386,7 @@ def nao_infer(queue, model, step):
     model.eval()
     for i, sample in enumerate(queue):
         encoder_input = sample['encoder_input']
-        encoder_input = Variable(encoder_input).cuda()
+        encoder_input = torch.tensor(encoder_input, requires_grad=True).cuda()
         model.zero_grad()
         new_arch = model.generate_new_arch(encoder_input, step)
         new_arch_list.extend(new_arch.data.squeeze().tolist())
@@ -414,7 +419,6 @@ def main():
             archs = list(map(utils.build_dag, archs))
             child_arch_pool = archs
 
-    child_eval_epochs = eval(args.child_eval_epochs)
     build_fn = get_builder(args.dataset)
     train_queue, valid_queue, model, train_criterion, eval_criterion, optimizer, scheduler = build_fn(ratio=0.9, epoch=0)
 
@@ -438,33 +442,17 @@ def main():
     nao = nao.cuda()
     logging.info("param size = %fMB", utils.count_parameters_in_MB(nao))
 
-    # Train child model
-    if args.child_arch_pool is None:
-        logging.info('Architecture pool is not provided, randomly generating now')
-        child_arch_pool = utils.generate_arch(args.controller_seed_arch, args.child_nodes, 5)  # [[[conv],[reduc]]]
-        child_arch_pool_prob = None
-    else:
-        if args.child_sample_policy == 'uniform':
-            child_arch_pool_prob = None
-        elif args.child_sample_policy == 'params':
-            child_arch_pool_prob = calculate_params(child_arch_pool)
-        elif args.child_sample_policy == 'valid_performance':
-            child_arch_pool_prob = child_valid(valid_queue, model, child_arch_pool)
-        else:
-            raise ValueError('Child model arch pool sample policy is not provided!')
-
-    eval_points = utils.generate_eval_points(child_eval_epochs, 0, args.child_epochs)
     step = 0
     for epoch in range(1, args.child_epochs + 1):
         scheduler.step()
         lr = scheduler.get_lr()[0]
         logging.info('epoch %d lr %e', epoch, lr)
         # sample an arch to train
-        train_acc, train_obj, step = child_train(train_queue, model, optimizer, step, child_arch_pool, child_arch_pool_prob, train_criterion)
+        train_acc, train_obj, step = child_train(train_queue, model, optimizer, step, None, None, train_criterion)
         logging.info('train_acc %f', train_acc)
     
-        if epoch not in eval_points:
-            continue
+    for i in range(3):
+        child_arch_pool = utils.generate_arch(args.controller_seed_arch, args.child_nodes, 5)
         # Evaluate seed archs
         valid_accuracy_list = child_valid(valid_queue, model, child_arch_pool, eval_criterion)
 
@@ -475,22 +463,16 @@ def main():
         old_archs_sorted_indices = np.argsort(old_archs_perf)
         old_archs = np.array(old_archs)[old_archs_sorted_indices].tolist()
         old_archs_perf = np.array(old_archs_perf)[old_archs_sorted_indices].tolist()
-        with open(os.path.join(args.output_dir, 'arch_pool.{}'.format(epoch)), 'w') as fa:
-            with open(os.path.join(args.output_dir, 'arch_pool.perf.{}'.format(epoch)), 'w') as fp:
-                with open(os.path.join(args.output_dir, 'arch_pool'), 'w') as fa_latest:
-                    with open(os.path.join(args.output_dir, 'arch_pool.perf'), 'w') as fp_latest:
-                        for arch, perf in zip(old_archs, old_archs_perf):
-                            arch = ' '.join(map(str, arch[0] + arch[1]))
-                            fa.write('{}\n'.format(arch))
-                            fa_latest.write('{}\n'.format(arch))
-                            fp.write('{}\n'.format(perf))
-                            fp_latest.write('{}\n'.format(perf))
+        with open(os.path.join(args.output_dir, 'arch_pool.{}'.format(i)), 'w') as fa:
+            with open(os.path.join(args.output_dir, 'arch_pool.perf.{}'.format(i)), 'w') as fp:
+                for arch, perf in zip(old_archs, old_archs_perf):
+                    arch = ' '.join(map(str, arch[0] + arch[1]))
+                    fa.write('{}\n'.format(arch))
+                    fp.write('{}\n'.format(perf))
                             
-        if epoch == args.child_epochs:
-            break
 
         # Train Encoder-Predictor-Decoder
-        logging.info('Training Encoder-Predictor-Decoder')
+        logging.info('Training Encoder-Predictor-Decoder for {} time'.format(i))
         encoder_input = list(map(lambda x: utils.parse_arch_to_seq(x[0], 2) + utils.parse_arch_to_seq(x[1], 2), old_archs))
         # [[conv, reduc]]
         min_val = min(old_archs_perf)
@@ -545,10 +527,6 @@ def main():
             new_arch_pool = old_archs + new_archs + utils.generate_arch(args.controller_random_arch, 5, 5)
         logging.info("Totally %d architectures now to train", len(new_arch_pool))
         child_arch_pool = new_arch_pool
-        with open(os.path.join(args.output_dir, 'arch_pool'), 'w') as f:
-            for arch in new_arch_pool:
-                arch = ' '.join(map(str, arch[0] + arch[1]))
-                f.write('{}\n'.format(arch))
   
 
 if __name__ == '__main__':
