@@ -48,40 +48,40 @@ class Node(nn.Module):
                 self.x_op.add_module('id_fact_reduce', FactorizedReduce(x_shape[-1], channels))
                 x_shape = [x_shape[0] // x_stride, x_shape[1] // x_stride, channels]
         elif x_op == 5:
-            self.x_op = OPERATIONS_large[x_op-5]
+            self.x_op = OPERATIONS_large[x_op]
             if x_stride > 1:
                 assert x_stride == 2
                 self.x_op.add_module('id_fact_reduce', FactorizedReduce(x_shape[-1], channels))
                 x_shape = [x_shape[0] // x_stride, x_shape[1] // x_stride, channels]
         elif x_op == 6:
-            self.x_op = OPERATIONS_large[x_op-5](channels, channels, 1, x_stride, 0)
+            self.x_op = OPERATIONS_large[x_op](channels, channels, 1, x_stride, 0)
             x_shape = [x_shape[0] // x_stride, x_shape[1] // x_stride, channels]
         elif x_op == 7:
-            self.x_op = OPERATIONS_large[x_op-5](channels, channels, 3, x_stride, 1)
+            self.x_op = OPERATIONS_large[x_op](channels, channels, 3, x_stride, 1)
             x_shape = [x_shape[0] // x_stride, x_shape[1] // x_stride, channels]
         elif x_op == 8:
-            self.x_op = OPERATIONS_large[x_op-5](channels, channels, (1,3), x_stride, (0,1))
+            self.x_op = OPERATIONS_large[x_op](channels, channels, (1,3), x_stride, (0,1))
             x_shape = [x_shape[0] // x_stride, x_shape[1] // x_stride, channels]
         elif x_op == 9:
-            self.x_op = OPERATIONS_large[x_op-5](channels, channels, (1,7), x_stride, (0,3))
+            self.x_op = OPERATIONS_large[x_op](channels, channels, (1,7), x_stride, (0,3))
             x_shape = [x_shape[0] // x_stride, x_shape[1] // x_stride, channels]
         elif x_op == 10:
-            self.x_op = OPERATIONS_large[x_op-5](2, stride=x_stride, padding=0)
+            self.x_op = OPERATIONS_large[x_op](2, stride=x_stride, padding=0)
             x_shape = [x_shape[0] // x_stride, x_shape[1] // x_stride, channels]
         elif x_op == 11:
-            self.x_op = OPERATIONS_large[x_op-5](3, stride=x_stride, padding=1)
+            self.x_op = OPERATIONS_large[x_op](3, stride=x_stride, padding=1)
             x_shape = [x_shape[0] // x_stride, x_shape[1] // x_stride, channels]
         elif x_op == 12:
-            self.x_op = OPERATIONS_large[x_op-5](5, stride=x_stride, padding=2)
+            self.x_op = OPERATIONS_large[x_op](5, stride=x_stride, padding=2)
             x_shape = [x_shape[0] // x_stride, x_shape[1] // x_stride, channels]
         elif x_op == 13:
-            self.x_op = OPERATIONS_large[x_op-5](2, stride=x_stride, padding=0)
+            self.x_op = OPERATIONS_large[x_op](2, stride=x_stride, padding=0)
             x_shape = [x_shape[0] // x_stride, x_shape[1] // x_stride, channels]
         elif x_op == 14:
-            self.x_op = OPERATIONS_large[x_op-5](3, stride=x_stride, padding=1)
+            self.x_op = OPERATIONS_large[x_op](3, stride=x_stride, padding=1)
             x_shape = [x_shape[0] // x_stride, x_shape[1] // x_stride, channels]
         elif x_op == 15:
-            self.x_op = OPERATIONS_large[x_op-5](5, stride=x_stride, padding=2)
+            self.x_op = OPERATIONS_large[x_op](5, stride=x_stride, padding=2)
             x_shape = [x_shape[0] // x_stride, x_shape[1] // x_stride, channels]
         
         y_stride = stride if y_id in [0, 1] else 1
@@ -104,40 +104,40 @@ class Node(nn.Module):
                 self.y_op.add_module('id_fact_reduce', FactorizedReduce(y_shape[-1], channels))
                 y_shape = [y_shape[0] // y_stride, y_shape[1] // y_stride, channels]
         elif y_op == 5:
-            self.y_op = OPERATIONS_large[y_op-5]
+            self.y_op = OPERATIONS_large[y_op]
             if y_stride > 1:
                 assert y_stride == 2
                 self.y_op.add_module('id_fact_reduce', FactorizedReduce(y_shape[-1], channels))
                 y_shape = [y_shape[0] // y_stride, y_shape[1] // y_stride, channels]
         elif y_op == 6:
-            self.y_op = OPERATIONS_large[y_op-5](channels, channels, 1, y_stride, 0)
+            self.y_op = OPERATIONS_large[y_op](channels, channels, 1, y_stride, 0)
             y_shape = [y_shape[0] // y_stride, y_shape[1] // y_stride, channels]
         elif y_op == 7:
-            self.y_op = OPERATIONS_large[y_op-5](channels, channels, 3, y_stride, 1)
+            self.y_op = OPERATIONS_large[y_op](channels, channels, 3, y_stride, 1)
             y_shape = [y_shape[0] // y_stride, y_shape[1] // y_stride, channels]
         elif y_op == 8:
-            self.y_op = OPERATIONS_large[y_op-5](channels, channels, (1,3), y_stride, (0,1))
+            self.y_op = OPERATIONS_large[y_op](channels, channels, (1,3), y_stride, (0,1))
             y_shape = [y_shape[0] // y_stride, y_shape[1] // y_stride, channels]
         elif y_op == 9:
-            self.y_op = OPERATIONS_large[y_op-5](channels, channels, (1,7), y_stride, (0,3))
+            self.y_op = OPERATIONS_large[y_op](channels, channels, (1,7), y_stride, (0,3))
             y_shape = [y_shape[0] // y_stride, y_shape[1] // y_stride, channels]
         elif y_op == 10:
-            self.y_op = OPERATIONS_large[y_op-5](2, stride=y_stride, padding=0)
+            self.y_op = OPERATIONS_large[y_op](2, stride=y_stride, padding=0)
             y_shape = [y_shape[0] // y_stride, y_shape[1] // y_stride, channels]
         elif y_op == 11:
-            self.y_op = OPERATIONS_large[y_op-5](3, stride=y_stride, padding=1)
+            self.y_op = OPERATIONS_large[y_op](3, stride=y_stride, padding=1)
             y_shape = [y_shape[0] // y_stride, y_shape[1] // y_stride, channels]
         elif y_op == 12:
-            self.y_op = OPERATIONS_large[y_op-5](5, stride=y_stride, padding=2)
+            self.y_op = OPERATIONS_large[y_op](5, stride=y_stride, padding=2)
             y_shape = [y_shape[0] // y_stride, y_shape[1] // y_stride, channels]
         elif y_op == 13:
-            self.y_op = OPERATIONS_large[y_op-5](2, stride=y_stride, padding=0)
+            self.y_op = OPERATIONS_large[y_op](2, stride=y_stride, padding=0)
             y_shape = [y_shape[0] // y_stride, y_shape[1] // y_stride, channels]
         elif y_op == 14:
-            self.y_op = OPERATIONS_large[y_op-5](3, stride=y_stride, padding=1)
+            self.y_op = OPERATIONS_large[y_op](3, stride=y_stride, padding=1)
             y_shape = [y_shape[0] // y_stride, y_shape[1] // y_stride, channels]
         elif y_op == 15:
-            self.y_op = OPERATIONS_large[y_op-5](5, stride=y_stride, padding=2)
+            self.y_op = OPERATIONS_large[y_op](5, stride=y_stride, padding=2)
             y_shape = [y_shape[0] // y_stride, y_shape[1] // y_stride, channels]
         
         assert x_shape[0] == y_shape[0] and x_shape[1] == y_shape[1]

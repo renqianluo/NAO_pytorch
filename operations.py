@@ -344,15 +344,15 @@ OPERATIONS = {
     4: nn.Identity,
 }
 OPERATIONS_large = {
-    0: nn.Identity,
-    1: Conv, # 1x1
-    2: Conv, # 3x3
-    3: Conv, # 1x3 + 3x1
-    4: Conv, # 1x7 + 7x1
-    5: nn.MaxPool2d, # 2x2
-    6: nn.MaxPool2d, # 3x3
-    7: nn.MaxPool2d, # 5x5
-    8: nn.AvgPool2d, # 2x2
-    9: nn.AvgPool2d, # 3x3
-    10: nn.AvgPool2d, # 5x5
+    5: nn.Identity,
+    6: Conv, # 1x1
+    7: Conv, # 3x3
+    8: Conv, # 1x3 + 3x1
+    9: Conv, # 1x7 + 7x1
+    10: nn.MaxPool2d, # 2x2
+    11: nn.MaxPool2d, # 3x3
+    12: nn.MaxPool2d, # 5x5
+    13: nn.AvgPool2d, # 2x2
+    14: nn.AvgPool2d, # 3x3
+    15: nn.AvgPool2d, # 5x5
 }
