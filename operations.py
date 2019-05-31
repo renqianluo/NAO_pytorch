@@ -94,6 +94,32 @@ class ReLUConvBN(nn.Module):
         return x
 
 
+class Conv(nn.Module):
+    def __init__(self, C_in, C_out, kernel_size, stride, padding, affine=True):
+        super(Conv, self).__init__()
+        if isinstance(kernel_size, int):
+            self.ops = nn.Sequential(
+                nn.ReLU(inplace=INPLACE),
+                nn.Conv2d(C_in, C_out, kernel_size, stride=stride, padding=padding, bias=False),
+                nn.BatchNorm2d(C_out, affine=affine)
+            )
+        else:
+            assert isinstance(kernel_size, tuple)
+            k1, k2 = kernel_size[0], kernel_size[1]
+            self.ops = nn.Sequential(
+                nn.ReLU(inplace=INPLACE),
+                nn.Conv2d(C_out, C_out, (k1, k2), stride=stride, padding=padding, bias=False),
+                nn.BatchNorm2d(C_out, affine=affine),
+                nn.ReLU(inplace=INPLACE),
+                nn.Conv2d(C_out, C_out, (k2, k1), stride=1, padding=padding, bias=False),
+                nn.BatchNorm2d(C_out, affine=affine),
+            )
+
+    def forward(self, x, bn_train=False):
+        x = self.ops(x)
+        return x
+
+
 class WSReLUConvBN(nn.Module):
     def __init__(self, num_possible_inputs, C_out, C_in, kernel_size, stride=1, padding=0):
         super(WSReLUConvBN, self).__init__()
@@ -311,9 +337,22 @@ class FinalCombine(nn.Module):
 
 
 OPERATIONS = {
-    0: SepConv,
-    1: SepConv,
-    2: nn.AvgPool2d,
-    3: nn.MaxPool2d,
+    0: SepConv, # 3x3
+    1: SepConv, # 5x5
+    2: nn.AvgPool2d, # 3x3
+    3: nn.MaxPool2d, # 3x3
     4: nn.Identity,
+}
+OPERATIONS_large = {
+    0: nn.Identity,
+    1: Conv, # 1x1
+    2: Conv, # 3x3
+    3: Conv, # 1x3 + 3x1
+    4: Conv, # 1x7 + 7x1
+    5: nn.MaxPool2d, # 2x2
+    6: nn.MaxPool2d, # 3x3
+    7: nn.MaxPool2d, # 5x5
+    8: nn.AvgPool2d, # 2x2
+    9: nn.AvgPool2d, # 3x3
+    10: nn.AvgPool2d, # 5x5
 }
