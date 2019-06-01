@@ -75,8 +75,8 @@ def train(train_queue, model, optimizer, global_step, criterion):
     top5 = utils.AvgrageMeter()
     model.train()
     for step, (input, target) in enumerate(train_queue):
-        input = torch.tensor(input, requires_grad=True).cuda()
-        target = torch.tensor(target, dtype=torch.float, requires_grad=True).cuda()
+        input = input.cuda().requires_grad_()
+        target = target.type(dtype=torch.float).cuda().requires_grad_()
     
         optimizer.zero_grad()
         logits, aux_logits = model(input, global_step)
@@ -108,8 +108,8 @@ def valid(valid_queue, model, criterion):
     with torch.no_grad():
         model.eval()
         for step, (input, target) in enumerate(valid_queue):
-            input = torch.tensor(input).cuda()
-            target = torch.tensor(target, dtype=torch.float).cuda()
+            input = input.cuda()
+            target = target.type(dtype=torch.float).cuda()
         
             logits, _ = model(input)
             loss = criterion(logits, target)
