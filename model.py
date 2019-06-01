@@ -48,7 +48,7 @@ class Node(nn.Module):
                 self.x_op.add_module('id_fact_reduce', FactorizedReduce(x_shape[-1], channels))
                 x_shape = [x_shape[0] // x_stride, x_shape[1] // x_stride, channels]
         elif x_op == 5:
-            self.x_op = OPERATIONS_large[x_op]
+            self.x_op = OPERATIONS_large[x_op]()
             if x_stride > 1:
                 assert x_stride == 2
                 self.x_op.add_module('id_fact_reduce', FactorizedReduce(x_shape[-1], channels))
@@ -104,7 +104,7 @@ class Node(nn.Module):
                 self.y_op.add_module('id_fact_reduce', FactorizedReduce(y_shape[-1], channels))
                 y_shape = [y_shape[0] // y_stride, y_shape[1] // y_stride, channels]
         elif y_op == 5:
-            self.y_op = OPERATIONS_large[y_op]
+            self.y_op = OPERATIONS_large[y_op]()
             if y_stride > 1:
                 assert y_stride == 2
                 self.y_op.add_module('id_fact_reduce', FactorizedReduce(y_shape[-1], channels))
