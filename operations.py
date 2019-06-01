@@ -107,10 +107,10 @@ class Conv(nn.Module):
             k1, k2 = kernel_size[0], kernel_size[1]
             self.ops = nn.Sequential(
                 nn.ReLU(inplace=INPLACE),
-                nn.Conv2d(C_out, C_out, (k1, k2), stride=stride, padding=padding, bias=False),
+                nn.Conv2d(C_out, C_out, (k1, k2), stride=stride, padding=padding[0], bias=False),
                 nn.BatchNorm2d(C_out, affine=affine),
                 nn.ReLU(inplace=INPLACE),
-                nn.Conv2d(C_out, C_out, (k2, k1), stride=1, padding=padding, bias=False),
+                nn.Conv2d(C_out, C_out, (k2, k1), stride=1, padding=padding[1], bias=False),
                 nn.BatchNorm2d(C_out, affine=affine),
             )
 
