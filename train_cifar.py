@@ -55,7 +55,7 @@ def train(train_queue, model, optimizer, global_step, criterion):
     model.train()
     for step, (input, target) in enumerate(train_queue):
         input = input.cuda().requires_grad_()
-        target = target.type(dtype=torch.float).cuda().requires_grad_()
+        target = target.cuda()
     
         optimizer.zero_grad()
         logits, aux_logits = model(input, global_step)
@@ -88,7 +88,7 @@ def valid(valid_queue, model, criterion):
         model.eval()
         for step, (input, target) in enumerate(valid_queue):
             input = input.cuda()
-            target = target.type(dtype=torch.float).cuda()
+            target = target.cuda()
         
             logits, _ = model(input)
             loss = criterion(logits, target)
