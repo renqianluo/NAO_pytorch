@@ -9,52 +9,52 @@ def get_HW(x):
     return x[1]
 
 def factorized_reduction(inputs, filters, strides, params):
-  assert filters % 2 == 0, (
-    'Need even number of filters when using this factorized reduction')
-  if strides == 1:
-    params.append(inputs[-1]*1*1*filters)
-    inputs = (inputs[0],inputs[1],filters)
-    params.append(4*filters)
-    return inputs
+    assert filters % 2 == 0, (
+        'Need even number of filters when using this factorized reduction')
+    if strides == 1:
+        params.append(inputs[-1]*1*1*filters)
+        inputs = (inputs[0],inputs[1],filters)
+        params.append(4*filters)
+        return inputs
 
-  ## strides == 2
-  params.append(inputs[-1]*1*1*filters/2)
-  path1 = inputs[0] // 2, inputs[1] // 2, filters//2
+    ## strides == 2
+    params.append(inputs[-1]*1*1*filters/2)
+    path1 = inputs[0] // 2, inputs[1] // 2, filters//2
   
-  params.append(inputs[-1]*1*1*filters//2)
-  path2 = inputs[0] // 2, inputs[1] // 2, filters//2
+    params.append(inputs[-1]*1*1*filters//2)
+    path2 = inputs[0] // 2, inputs[1] // 2, filters//2
   
 
-  final_path = path1[0], path1[1], filters
-  params.append(final_path[-1])
+    final_path = path1[0], path1[1], filters
+    params.append(final_path[-1])
   
-  return final_path
+    return final_path
 
 
 class NASCell(object):
-  def __init__(self, filters, dag, num_nodes, num_cells):
-    self._filters = filters
-    self._dag = dag
-    self._num_nodes = num_nodes
-    self._num_cells = num_cells
+    def __init__(self, filters, dag, num_nodes, num_cells):
+        self._filters = filters
+        self._dag = dag
+        self._num_nodes = num_nodes
+        self._num_cells = num_cells
 
-  def _reduce_prev_layer(self, prev_layer, curr_layer, params):
-    if prev_layer is None:
-      return curr_layer
+    def _reduce_prev_layer(self, prev_layer, curr_layer, params):
+        if prev_layer is None:
+            return curr_layer
 
-    curr_num_filters = self._filter_size
-    data_format = self._data_format
+        curr_num_filters = self._filter_size
+        data_format = self._data_format
 
-    prev_num_filters = get_channel_dim(prev_layer)
-    curr_filter_shape = int(curr_layer[0])
-    prev_filter_shape = int(prev_layer[0])
-    if curr_filter_shape != prev_filter_shape:
-      prev_layer = factorized_reduction(prev_layer, curr_num_filters, 2, params)
-    elif curr_num_filters != prev_num_filters:
-      params.append(1*1*prev_layer[-1]*curr_num_filters)
-      prev_layer = prev_layer[0], prev_layer[1], curr_num_filters
-      params.append(curr_num_filters*4)
-    return prev_layer
+        prev_num_filters = get_channel_dim(prev_layer)
+        curr_filter_shape = int(curr_layer[0])
+        prev_filter_shape = int(prev_layer[0])
+        if curr_filter_shape != prev_filter_shape:
+            prev_layer = factorized_reduction(prev_layer, curr_num_filters, 2, params)
+        elif curr_num_filters != prev_num_filters:
+            params.append(1*1*prev_layer[-1]*curr_num_filters)
+            prev_layer = prev_layer[0], prev_layer[1], curr_num_filters
+            params.append(curr_num_filters*4)
+        return prev_layer
 
 
   def _nas_conv(self, x, curr_cell, prev_cell, filter_size, out_filters, stack_conv=1):

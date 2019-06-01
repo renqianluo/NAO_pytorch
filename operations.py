@@ -341,10 +341,10 @@ OPERATIONS = {
     1: SepConv, # 5x5
     2: nn.AvgPool2d, # 3x3
     3: nn.MaxPool2d, # 3x3
-    4: nn.Identity,
+    4: Identity,
 }
 OPERATIONS_large = {
-    5: nn.Identity,
+    5: Identity,
     6: Conv, # 1x1
     7: Conv, # 3x3
     8: Conv, # 1x3 + 3x1
