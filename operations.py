@@ -21,14 +21,14 @@ def apply_drop_path(x, drop_path_keep_prob, layer_id, layers, step, steps):
 class AuxHeadCIFAR(nn.Module):
     def __init__(self, C_in, classes):
         super(AuxHeadCIFAR, self).__init__()
-        self.relu1 = nn.ReLU(inplace=INPLACE)
+        self.relu1 = nn.ReLU(inplace=True)
         self.avg_pool = nn.AvgPool2d(5, stride=3, padding=0, count_include_pad=False)
         self.conv1 = nn.Conv2d(C_in, 128, 1, bias=False)
         self.bn1 = nn.BatchNorm2d(128)
-        self.relu2 = nn.ReLU(inplace=INPLACE)
+        self.relu2 = nn.ReLU(inplace=True)
         self.conv2 = nn.Conv2d(128, 768, 2, bias=False)
         self.bn2 = nn.BatchNorm2d(768)
-        self.relu3 = nn.ReLU(inplace=INPLACE)
+        self.relu3 = nn.ReLU(inplace=True)
         self.classifier = nn.Linear(768, classes)
         
     def forward(self, x, bn_train=False):
@@ -51,14 +51,14 @@ class AuxHeadImageNet(nn.Module):
     def __init__(self, C_in, classes):
         """input should be in [B, C, 14, 14]"""
         super(AuxHeadImageNet, self).__init__()
-        self.relu1 = nn.ReLU(inplace=INPLACE)
+        self.relu1 = nn.ReLU(inplace=True)
         self.avg_pool = nn.AvgPool2d(5, stride=2, padding=0, count_include_pad=False)
         self.conv1 = nn.Conv2d(C_in, 128, 1, bias=False)
         self.bn1 = nn.BatchNorm2d(128)
-        self.relu2 = nn.ReLU(inplace=INPLACE)
+        self.relu2 = nn.ReLU(inplace=True)
         self.conv2 = nn.Conv2d(128, 768, 2, bias=False)
         self.bn2 = nn.BatchNorm2d(768)
-        self.relu3 = nn.ReLU(inplace=INPLACE)
+        self.relu3 = nn.ReLU(inplace=True)
         self.classifier = nn.Linear(768, classes)
     
     def forward(self, x, bn_train=False):

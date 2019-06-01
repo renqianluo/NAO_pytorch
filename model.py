@@ -305,18 +305,18 @@ class NASNetworkImageNet(nn.Module):
         self.stem0 = nn.Sequential(
             nn.Conv2d(3, channels // 2, 3, stride=2, padding=1, bias=False),
             nn.BatchNorm2d(channels // 2),
-            nn.ReLU(inplace=False),
+            nn.ReLU(inplace=True),
             nn.Conv2d(channels // 2, channels, 3, stride=2, padding=1, bias=False),
-            nn.BatchNorm2d(channels // 2),
+            nn.BatchNorm2d(channels),
         )
 
         self.stem1 = nn.Sequential(
-            nn.ReLU(inplace=False),
+            nn.ReLU(inplace=True),
             nn.Conv2d(channels, channels, 3, stride=2, padding=1, bias=False),
             nn.BatchNorm2d(channels),
         )
         
-        outs = [[112, 112, channels // 2], [56, 56, channels]]
+        outs = [[112, 112, channels], [56, 56, channels]]
         channels = self.channels
         self.cells = nn.ModuleList()
         for i in range(self.layers + 2):
