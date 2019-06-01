@@ -144,12 +144,12 @@ class Node(nn.Module):
         self.out_shape = list(x_shape)
         
     def forward(self, x, y, step):
-        if self.x_op in [10, 13]:
+        if self.x_op_id in [10, 13]:
             x = F.pad(x, [0, 1, 0, 1])
         x = self.x_op(x)
         if self.x_id not in [4, 5] and self.drop_path_keep_prob is not None and self.training:
             x = apply_drop_path(x, self.drop_path_keep_prob, self.layer_id, self.layers, step, self.steps)
-        if self.y_op in [10, 13]:
+        if self.y_op_id in [10, 13]:
             y = F.pad(y, [0, 1, 0, 1])
         y = self.y_op(y)
         if self.y_id not in [4, 5] and self.drop_path_keep_prob is not None and self.training:
