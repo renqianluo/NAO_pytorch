@@ -12,8 +12,7 @@ def apply_drop_path(x, drop_path_keep_prob, layer_id, layers, step, steps):
     step_ratio = float(step + 1) / steps
     drop_path_keep_prob = 1.0 - step_ratio * (1.0 - drop_path_keep_prob)
     if drop_path_keep_prob < 1.:
-        noise_shape = [x.size(0), 1, 1, 1]
-        mask =torch.FloatTensor(*noise_shape).bernoulli_(drop_path_keep_prob)
+        mask =torch.FloatTensor(x.size(0), 1, 1, 1).bernoulli_(drop_path_keep_prob).cuda().requires_grad_()
         x.div_(drop_path_keep_prob)
         x.mul_(mask)
     return x
