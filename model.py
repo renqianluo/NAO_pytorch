@@ -255,7 +255,7 @@ class NASNetworkCIFAR(nn.Module):
         #self.relu = nn.ReLU(inplace=False)
         self.global_pooling = nn.AdaptiveAvgPool2d(1)
         self.dropout = nn.Dropout(1 - self.keep_prob)
-        self.classifier = nn.Linear(outs[-1][-1], 10)
+        self.classifier = nn.Linear(outs[-1][-1], classes)
         
         self.init_parameters()
     
