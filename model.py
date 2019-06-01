@@ -154,7 +154,7 @@ class Node(nn.Module):
         y = self.y_op(y)
         if self.y_id not in [4, 5] and self.drop_path_keep_prob is not None and self.training:
             y = apply_drop_path(y, self.drop_path_keep_prob, self.layer_id, self.layers, step, self.steps)
-        #print(x.shape,y.shape,self.x_id,self.y_id,self.x_op,self.y_op)
+        print(x.shape,y.shape,self.x_id,self.y_id,self.x_op,self.y_op)
         out = x + y
         return out
     
@@ -297,6 +297,7 @@ class NASNetworkImageNet(nn.Module):
         
         self.pool_layers = [self.layers, 2 * self.layers + 1]
         self.layers = self.layers * 3
+        self.multi_adds = 0
         
         if self.use_aux_head:
             self.aux_head_index = self.pool_layers[-1]
@@ -309,7 +310,7 @@ class NASNetworkImageNet(nn.Module):
             nn.Conv2d(channels // 2, channels, 3, stride=2, padding=1, bias=False),
             nn.BatchNorm2d(channels),
         )
-
+        self.multi_adds += 3 * 3 * 3 * channels // 2 + 3 * 3 * 3 * channels // 2 * channels
         self.stem1 = nn.Sequential(
             nn.ReLU(inplace=True),
             nn.Conv2d(channels, channels, 3, stride=2, padding=1, bias=False),
