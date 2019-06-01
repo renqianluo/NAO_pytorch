@@ -55,7 +55,7 @@ def train(train_queue, model, optimizer, global_step, criterion):
     model.train()
     for step, (input, target) in enumerate(train_queue):
         input = torch.tensor(input, requires_grad=True).cuda()
-        target = torch.tensor(target, requires_grad=True).cuda()
+        target = torch.tensor(target, dtype=torch.float, requires_grad=True).cuda()
     
         optimizer.zero_grad()
         logits, aux_logits = model(input, global_step)
@@ -88,7 +88,7 @@ def valid(valid_queue, model, criterion):
         model.eval()
         for step, (input, target) in enumerate(valid_queue):
             input = torch.tensor(input).cuda()
-            target = torch.tensor(target).cuda()
+            target = torch.tensor(target, dtype=torch.float).cuda()
         
             logits, _ = model(input)
             loss = criterion(logits, target)

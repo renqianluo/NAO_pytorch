@@ -272,7 +272,7 @@ def child_train(train_queue, model, optimizer, global_step, arch_pool, arch_pool
     model.train()
     for step, (input, target) in enumerate(train_queue):
         input = torch.tensor(input, requires_grad=True).cuda()
-        target = torch.tensor(target, requires_grad=True).cuda()
+        target = torch.tensor(target, dtype=torch.float, requires_grad=True).cuda()
 
         optimizer.zero_grad()
         # sample an arch to train
@@ -308,7 +308,7 @@ def child_valid(valid_queue, model, arch_pool, criterion):
             # for step, (input, target) in enumerate(valid_queue):
             inputs, targets = next(iter(valid_queue))
             inputs = torch.tensor(inputs).cuda()
-            targets = torch.tensor(targets).cuda()
+            targets = torch.tensor(targets, dtype=torch.float).cuda()
                 
             logits, _ = model(inputs, arch, bn_train=True)
             loss = criterion(logits, targets)
