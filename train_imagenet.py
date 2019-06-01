@@ -91,9 +91,9 @@ def train(train_queue, model, optimizer, global_step, criterion):
     
         prec1, prec5 = utils.accuracy(logits, target, topk=(1, 5))
         n = input.size(0)
-        objs.update(loss.data[0], n)
-        top1.update(prec1.data[0], n)
-        top5.update(prec5.data[0], n)
+        objs.update(loss.data, n)
+        top1.update(prec1.data, n)
+        top5.update(prec5.data, n)
     
         if step % 100 == 0:
             logging.info('train %03d loss %e top1 %f top5 %f', step, objs.avg, top1.avg, top5.avg)
@@ -116,9 +116,9 @@ def valid(valid_queue, model, criterion):
         
             prec1, prec5 = utils.accuracy(logits, target, topk=(1, 5))
             n = input.size(0)
-            objs.update(loss.data[0], n)
-            top1.update(prec1.data[0], n)
-            top5.update(prec5.data[0], n)
+            objs.update(loss.data, n)
+            top1.update(prec1.data, n)
+            top5.update(prec5.data, n)
         
             if step % 100 == 0:
                 logging.info('valid %03d %e %f %f', step, objs.avg, top1.avg, top5.avg)
