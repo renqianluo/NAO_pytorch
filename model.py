@@ -22,9 +22,9 @@ class Node(nn.Module):
         self.layers = layers
         self.steps = steps
         self.x_id = x_id
-        self.x_op = x_op
-        self.y_op = y_op
+        self.x_op_id = x_op
         self.y_id = y_id
+        self.y_op_id = y_op
         x_shape = list(x_shape)
         y_shape = list(y_shape)
         
