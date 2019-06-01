@@ -60,10 +60,10 @@ class Node(nn.Module):
             self.x_op = OPERATIONS_large[x_op](channels, channels, 3, x_stride, 1)
             x_shape = [x_shape[0] // x_stride, x_shape[1] // x_stride, channels]
         elif x_op == 8:
-            self.x_op = OPERATIONS_large[x_op](channels, channels, (1,3), x_stride, ((0,1),(1,0))
+            self.x_op = OPERATIONS_large[x_op](channels, channels, (1,3), x_stride, ((0,1),(1,0)))
             x_shape = [x_shape[0] // x_stride, x_shape[1] // x_stride, channels]
         elif x_op == 9:
-            self.x_op = OPERATIONS_large[x_op](channels, channels, (1,7), x_stride, ((0,3),(3,0))
+            self.x_op = OPERATIONS_large[x_op](channels, channels, (1,7), x_stride, ((0,3),(3,0)))
             x_shape = [x_shape[0] // x_stride, x_shape[1] // x_stride, channels]
         elif x_op == 10:
             self.x_op = OPERATIONS_large[x_op](2, stride=x_stride, padding=0)
@@ -116,10 +116,10 @@ class Node(nn.Module):
             self.y_op = OPERATIONS_large[y_op](channels, channels, 3, y_stride, 1)
             y_shape = [y_shape[0] // y_stride, y_shape[1] // y_stride, channels]
         elif y_op == 8:
-            self.y_op = OPERATIONS_large[y_op](channels, channels, (1,3), y_stride, ((0,1),(1,0))
+            self.y_op = OPERATIONS_large[y_op](channels, channels, (1,3), y_stride, ((0,1),(1,0)))
             y_shape = [y_shape[0] // y_stride, y_shape[1] // y_stride, channels]
         elif y_op == 9:
-            self.y_op = OPERATIONS_large[y_op](channels, channels, (1,7), y_stride, ((0,3),(3,0))
+            self.y_op = OPERATIONS_large[y_op](channels, channels, (1,7), y_stride, ((0,3),(3,0)))
             y_shape = [y_shape[0] // y_stride, y_shape[1] // y_stride, channels]
         elif y_op == 10:
             self.y_op = OPERATIONS_large[y_op](2, stride=y_stride, padding=0)
