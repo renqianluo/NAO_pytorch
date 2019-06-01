@@ -22,7 +22,7 @@ parser = argparse.ArgumentParser()
 # Basic model parameters.
 parser.add_argument('--mode', type=str, default='train',
                     choices=['train', 'test'])
-parser.add_argument('--data_path', type=str, default='data/imagenet')
+parser.add_argument('--data', type=str, default='data/imagenet')
 parser.add_argument('--zip_file', action='store_true', default=False)
 parser.add_argument('--lazy_load', action='store_true', default=False) # best practice: do not use lazy_load. when using zip_file, do not use lazy_load
 parser.add_argument('--output_dir', type=str, default='models')
