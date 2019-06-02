@@ -65,7 +65,7 @@ def train(train_queue, model, optimizer, global_step, criterion):
             aux_loss = criterion(aux_logits, target)
             loss += 0.4 * aux_loss
         loss.backward()
-        nn.utils.clip_grad_norm(model.parameters(), args.grad_bound)
+        nn.utils.clip_grad_norm_(model.parameters(), args.grad_bound)
         optimizer.step()
     
         prec1, prec5 = utils.accuracy(logits, target, topk=(1, 5))
@@ -190,7 +190,7 @@ def main():
     args.steps = int(np.ceil(50000 / args.batch_size)) * args.epochs
     logging.info("Args = %s", args)
     
-    _, model_state_dict, epoch, step, optimizer_state_dict = utils.load(args.output_dir)
+    _, model_state_dict, epoch, step, optimizer_state_dict, best_acc_top1 = utils.load(args.output_dir)
     build_fn = get_builder(args.dataset)
     train_queue, valid_queue, model, train_criterion, eval_criterion, optimizer, scheduler = build_fn(epoch=epoch-1)
     
@@ -207,7 +207,11 @@ def main():
         valid_acc, valid_obj = valid(valid_queue, model, eval_criterion)
         logging.info('valid_acc %f', valid_acc)
         epoch += 1
-        utils.save(args.output_dir, args, model, epoch, step, optimizer)
+        is_best = False
+        if valid_acc_top1 > best_acc_top1:
+            best_acc_top1 = valid_acc_top1
+            is_best = True
+        utils.save(args.output_dir, args, model, epoch, step, optimizer, best_acc_top1, is_best)
         
 
 if __name__ == '__main__':

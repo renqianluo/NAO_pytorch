@@ -86,7 +86,7 @@ def train(train_queue, model, optimizer, global_step, criterion):
             aux_loss = criterion(aux_logits, target)
             loss += 0.4 * aux_loss
         loss.backward()
-        nn.utils.clip_grad_norm(model.parameters(), args.grad_clip)
+        nn.utils.clip_grad_norm_(model.parameters(), args.grad_clip)
         optimizer.step()
     
         prec1, prec5 = utils.accuracy(logits, target, topk=(1, 5))
@@ -123,7 +123,7 @@ def valid(valid_queue, model, criterion):
             if step % 100 == 0:
                 logging.info('valid %03d %e %f %f', step, objs.avg, top1.avg, top5.avg)
 
-    return top1.avg, objs.avg
+    return top1.avg, top5.avg, objs.avg
 
 
 def build_imagenet(model_state_dict, optimizer_state_dict, **kwargs):
@@ -213,7 +213,7 @@ def main():
     
     logging.info("Args = %s", args)
     
-    _, model_state_dict, epoch, step, optimizer_state_dict = utils.load(args.output_dir)
+    _, model_state_dict, epoch, step, optimizer_state_dict, best_acc_top1 = utils.load(args.output_dir)
     train_queue, valid_queue, model, train_criterion, eval_criterion, optimizer, scheduler = build_imagenet(model_state_dict, optimizer_state_dict, epoch=epoch-1)
     
     if torch.cuda.device_count() > 1:
@@ -226,10 +226,16 @@ def main():
         logging.info('epoch %d lr %e', epoch, scheduler.get_lr()[0])
         train_acc, train_obj, step = train(train_queue, model, optimizer, step, train_criterion)
         logging.info('train_acc %f', train_acc)
-        valid_acc, valid_obj = valid(valid_queue, model, eval_criterion)
-        logging.info('valid_acc %f', valid_acc)
+        valid_acc_top1, valid_acc_top5, valid_obj = valid(valid_queue, model, eval_criterion)
+        logging.info('valid_acc_top1 %f', valid_acc_top1)
+        logging.info('valid_acc_top5 %f', valid_acc_top5)
+
         epoch += 1
-        utils.save(args.output_dir, args, model, epoch, step, optimizer)
+        is_best = False
+        if valid_acc_top1 > best_acc_top1:
+            best_acc_top1 = valid_acc_top1
+            is_best = True
+        utils.save(args.output_dir, args, model, epoch, step, optimizer, best_acc_top1, is_best)
         
 
 if __name__ == '__main__':
