@@ -155,7 +155,7 @@ class Decoder(nn.Module):
         
         # set default input and max decoding length
         if x is None:
-            x = torch.LongTensor([self.sos_id] * batch_size).view(batch_size, 1).cuda().requires_grad_()
+            x = torch.LongTensor([self.sos_id] * batch_size).view(batch_size, 1).cuda()
             max_length = self.length
         else:
             max_length = x.size(1)
