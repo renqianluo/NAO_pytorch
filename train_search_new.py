@@ -288,7 +288,7 @@ def child_train(train_queue, model, optimizer, global_step, arch_pool, arch_pool
             aux_loss = criterion(aux_logits, target)
             loss += 0.4 * aux_loss
         loss.backward()
-        nn.utils.clip_grad_norm(model.parameters(), args.child_grad_bound)
+        nn.utils.clip_grad_norm_(model.parameters(), args.child_grad_bound)
         optimizer.step()
         
         prec1, prec5 = utils.accuracy(logits, target, topk=(1, 5))
@@ -348,7 +348,7 @@ def nao_train(train_queue, model, optimizer):
         loss_2 = F.nll_loss(log_prob.contiguous().view(-1, log_prob.size(-1)), decoder_target.view(-1))
         loss = args.controller_trade_off * loss_1 + (1 - args.controller_trade_off) * loss_2
         loss.backward()
-        torch.nn.utils.clip_grad_norm(model.parameters(), args.controller_grad_bound)
+        torch.nn.utils.clip_grad_norm_(model.parameters(), args.controller_grad_bound)
         optimizer.step()
         
         n = encoder_input.size(0)
