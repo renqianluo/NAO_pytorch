@@ -74,7 +74,7 @@ def nao_train(train_queue, model, optimizer):
         loss_2 = F.nll_loss(log_prob.contiguous().view(-1, log_prob.size(-1)), decoder_target.view(-1))
         loss = args.controller_trade_off * loss_1 + (1 - args.controller_trade_off) * loss_2
         loss.backward()
-        torch.nn.utils.clip_grad_norm(model.parameters(), args.controller_grad_bound)
+        torch.nn.utils.clip_grad_norm_(model.parameters(), args.controller_grad_bound)
         optimizer.step()
         
         n = encoder_input.size(0)
