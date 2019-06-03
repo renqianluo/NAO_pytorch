@@ -297,8 +297,8 @@ def child_train(train_queue, model, optimizer, global_step, arch_pool, arch_pool
         top1.update(prec1.data, n)
         top5.update(prec5.data, n)
         
-        if step % 100 == 0:
-            logging.info('Train %03d loss %e top1 %f top5 %f', step, objs.avg, top1.avg, top5.avg)
+        if (step+1) % 100 == 0:
+            logging.info('Train %03d loss %e top1 %f top5 %f', step+1, objs.avg, top1.avg, top5.avg)
             logging.info('Arch: %s', ' '.join(map(str, arch[0] + arch[1])))
 
     return top1.avg, objs.avg, global_step
