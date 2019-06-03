@@ -114,8 +114,10 @@ def build_cifar10(model_state_dict, optimizer_state_dict, **kwargs):
     ratio = kwargs.pop('ratio')
     train_transform, valid_transform = utils._data_transforms_cifar10(args.child_cutout_size)
     train_data = dset.CIFAR10(root=args.data_path, train=True, download=True, transform=train_transform)
-    
+    valid_data = dset.CIFAR10(root=args.data_path, train=True, download=True, transform=valid_transform)
+
     num_train = len(train_data)
+    assert num_train == len(valid_data)
     indices = list(range(num_train))    
     split = int(np.floor(ratio * num_train))
     np.random.shuffle(indices)
@@ -125,7 +127,7 @@ def build_cifar10(model_state_dict, optimizer_state_dict, **kwargs):
         sampler=torch.utils.data.sampler.SubsetRandomSampler(indices[:split]),
         pin_memory=True, num_workers=16)
     valid_queue = torch.utils.data.DataLoader(
-        train_data, batch_size=args.child_eval_batch_size,
+        valid_data, batch_size=args.child_eval_batch_size,
         sampler=torch.utils.data.sampler.SubsetRandomSampler(indices[split:num_train]),
         pin_memory=True, num_workers=16)
     
@@ -155,8 +157,10 @@ def build_cifar100(model_state_dict, optimizer_state_dict, **kwargs):
     ratio = kwargs.pop('ratio')
     train_transform, valid_transform = utils._data_transforms_cifar10(args.cutout_size)
     train_data = dset.CIFAR100(root=args.data_path, train=True, download=True, transform=train_transform)
+    valid_data = dset.CIFAR100(root=args.data_path, train=True, download=True, transform=valid_transform)
 
     num_train = len(train_data)
+    assert num_train == len(valid_data)
     indices = list(range(num_train))    
     split = int(np.floor(ratio * num_train))
     np.random.shuffle(indices)
@@ -166,7 +170,7 @@ def build_cifar100(model_state_dict, optimizer_state_dict, **kwargs):
         sampler=torch.utils.data.sampler.SubsetRandomSampler(indices[:split]),
         pin_memory=True, num_workers=16)
     valid_queue = torch.utils.data.DataLoader(
-        train_data, batch_size=args.child_eval_batch_size,
+        valid_data, batch_size=args.child_eval_batch_size,
         sampler=torch.utils.data.sampler.SubsetRandomSampler(indices[split:num_train]),
         pin_memory=True, num_workers=16)
     
@@ -271,8 +275,8 @@ def child_train(train_queue, model, optimizer, global_step, arch_pool, arch_pool
     top5 = utils.AvgrageMeter()
     model.train()
     for step, (input, target) in enumerate(train_queue):
-        input = torch.tensor(input, requires_grad=True).cuda()
-        target = torch.tensor(target, requires_grad=True).cuda()
+        input = input.cuda().requires_grad_()
+        target = target.cuda()
 
         optimizer.zero_grad()
         # sample an arch to train
@@ -310,8 +314,8 @@ def child_valid(valid_queue, model, arch_pool, criterion):
         for i, arch in enumerate(arch_pool):
             # for step, (input, target) in enumerate(valid_queue):
             inputs, targets = next(iter(valid_queue))
-            inputs = torch.tensor(inputs).cuda()
-            targets = torch.tensor(targets).cuda()
+            inputs = inputs.cuda()
+            targets = targets.cuda()
                 
             logits, _ = model(inputs, arch, bn_train=True)
             loss = criterion(logits, targets)
@@ -336,10 +340,10 @@ def nao_train(train_queue, model, optimizer):
         decoder_input = sample['decoder_input']
         decoder_target = sample['decoder_target']
         
-        encoder_input = torch.tensor(encoder_input, requires_grad=True).cuda()
-        encoder_target = torch.tensor(encoder_target, requires_grad=True).cuda()
-        decoder_input = torch.tensor(decoder_input, requires_grad=True).cuda()
-        decoder_target = torch.tensor(decoder_target, requires_grad=True).cuda()
+        encoder_input = encoder_input.cuda().requires_grad_()
+        encoder_target = encoder_target.cuda().requires_grad_()
+        decoder_input = decoder_input.cuda().requires_grad_()
+        decoder_target = decoder_target.cuda().requires_grad_()
         
         optimizer.zero_grad()
         predict_value, log_prob, arch = model(encoder_input, decoder_input)
@@ -368,9 +372,9 @@ def nao_valid(queue, model):
             encoder_target = sample['encoder_target']
             decoder_target = sample['decoder_target']
             
-            encoder_input = torch.tensor(encoder_input, requires_grad=False).cuda()
-            encoder_target = torch.tensor(encoder_target, requires_grad=False).cuda()
-            decoder_target = torch.tensor(decoder_target, requires_grad=False).cuda()
+            encoder_input = encoder_input.cuda()
+            encoder_target = encoder_target.cuda()
+            decoder_target = decoder_target.cuda()
             
             predict_value, logits, arch = model(encoder_input)
             n = encoder_input.size(0)
@@ -386,7 +390,7 @@ def nao_infer(queue, model, step):
     model.eval()
     for i, sample in enumerate(queue):
         encoder_input = sample['encoder_input']
-        encoder_input = torch.tensor(encoder_input, requires_grad=True).cuda()
+        encoder_input = encoder_input.cuda().requires_grad_()
         model.zero_grad()
         new_arch = model.generate_new_arch(encoder_input, step)
         new_arch_list.extend(new_arch.data.squeeze().tolist())

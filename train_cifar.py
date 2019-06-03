@@ -189,10 +189,11 @@ def main():
     
     args.steps = int(np.ceil(50000 / args.batch_size)) * args.epochs
     logging.info("Args = %s", args)
+    logging.info("multi adds = %fMB", model.multi_adds / 1000000)
     
     _, model_state_dict, epoch, step, optimizer_state_dict, best_acc_top1 = utils.load(args.output_dir)
     build_fn = get_builder(args.dataset)
-    train_queue, valid_queue, model, train_criterion, eval_criterion, optimizer, scheduler = build_fn(epoch=epoch-1)
+    train_queue, valid_queue, model, train_criterion, eval_criterion, optimizer, scheduler = build_fn(model_state_dict, optimizer_state_dict, epoch=epoch-1)
     
     if torch.cuda.device_count() > 1:
         logging.info("Use %d %s", torch.cuda.device_count(), "GPUs !")
@@ -204,8 +205,8 @@ def main():
         logging.info('epoch %d lr %e', epoch, scheduler.get_lr()[0])
         train_acc, train_obj, step = train(train_queue, model, optimizer, step, train_criterion)
         logging.info('train_acc %f', train_acc)
-        valid_acc, valid_obj = valid(valid_queue, model, eval_criterion)
-        logging.info('valid_acc %f', valid_acc)
+        valid_acc_top1, valid_obj = valid(valid_queue, model, eval_criterion)
+        logging.info('valid_acc %f', valid_acc_top1)
         epoch += 1
         is_best = False
         if valid_acc_top1 > best_acc_top1:
