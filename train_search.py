@@ -337,10 +337,10 @@ def nao_train(train_queue, model, optimizer):
         decoder_input = sample['decoder_input']
         decoder_target = sample['decoder_target']
         
-        encoder_input = encoder_input.cuda().requires_grad_()
+        encoder_input = encoder_input.cuda()
         encoder_target = encoder_target.cuda().requires_grad_()
-        decoder_input = decoder_input.cuda().requires_grad_()
-        decoder_target = decoder_target.cuda().requires_grad_()
+        decoder_input = decoder_input.cuda()
+        decoder_target = decoder_target.cuda()
         
         optimizer.zero_grad()
         predict_value, log_prob, arch = model(encoder_input, decoder_input)
@@ -387,7 +387,7 @@ def nao_infer(queue, model, step, direction='+'):
     model.eval()
     for i, sample in enumerate(queue):
         encoder_input = sample['encoder_input']
-        encoder_input = encoder_input.cuda().requires_grad_()
+        encoder_input = encoder_input.cuda()
         model.zero_grad()
         new_arch = model.generate_new_arch(encoder_input, step, direction=direction)
         new_arch_list.extend(new_arch.data.squeeze().tolist())
