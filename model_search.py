@@ -179,13 +179,12 @@ class NASNetworkCIFAR(nn.Module):
             # normal cell
             if i not in self.pool_layers:
                 cell = Cell(outs, self.nodes, channels, False, i, self.total_layers, self.steps, self.drop_path_keep_prob)
-                outs = [outs[-1], cell.out_shape]
             # reduction cell
             else:
                 channels *= 2
                 cell = Cell(outs, self.nodes, channels, True, i, self.total_layers, self.steps, self.drop_path_keep_prob)
-                outs = [outs[-1], cell.out_shape]
             self.cells.append(cell)
+            outs = [outs[-1], cell.out_shape]
             
             if self.use_aux_head and i == self.aux_head_index:
                 self.auxiliary_head = AuxHeadCIFAR(outs[-1][-1], classes)
