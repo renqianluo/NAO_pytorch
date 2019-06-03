@@ -124,9 +124,9 @@ def main():
     arch_pool = utils.generate_arch(args.controller_seed_arch, 5, 5)
     valid_arch_pool = utils.generate_arch(100, 5, 5)
     train_encoder_input = list(map(lambda x: utils.parse_arch_to_seq(x[0], 2) + utils.parse_arch_to_seq(x[1], 2), arch_pool))
+    valid_encoder_input = list(map(lambda x: utils.parse_arch_to_seq(x[0], 2) + utils.parse_arch_to_seq(x[1], 2), valid_arch_pool))
     train_encoder_target = [np.random.random() for i in range(args.controller_seed_arch)]
     valid_encoder_target = [np.random.random() for i in range(100)]
-    valid_encoder_input = list(map(lambda x: utils.parse_arch_to_seq(x[0], 2) + utils.parse_arch_to_seq(x[1], 2), valid_arch_pool))
     nao = NAO(
         args.controller_encoder_layers,
         args.controller_encoder_vocab_size,

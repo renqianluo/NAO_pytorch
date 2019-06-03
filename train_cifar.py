@@ -26,7 +26,7 @@ parser.add_argument('--dataset', type=str, default='cifar10', choices=['cifar10,
 parser.add_argument('--output_dir', type=str, default='models')
 parser.add_argument('--batch_size', type=int, default=160)
 parser.add_argument('--eval_batch_size', type=int, default=500)
-parser.add_argument('--epochs', type=int, default=250)
+parser.add_argument('--epochs', type=int, default=6000)
 parser.add_argument('--layers', type=int, default=6)
 parser.add_argument('--nodes', type=int, default=5)
 parser.add_argument('--channels', type=int, default=128)
@@ -125,10 +125,11 @@ def build_cifar10(model_state_dict, optimizer_state_dict, **kwargs):
     
     model = NASNetworkCIFAR(10, args.layers, args.nodes, args.channels, args.keep_prob, args.drop_path_keep_prob,
                        args.use_aux_head, args.steps, args.arch)
-    model = model.cuda()
+    
     train_criterion = nn.CrossEntropyLoss().cuda()
     eval_criterion = nn.CrossEntropyLoss().cuda()
     logging.info("param size = %fMB", utils.count_parameters_in_MB(model))
+    logging.info("multi adds = %fMB", model.multi_adds / 1000000)
 
     optimizer = torch.optim.SGD(
         model.parameters(),
@@ -157,10 +158,11 @@ def build_cifar100(model_state_dict, optimizer_state_dict, **kwargs):
     
     model = NASNetworkCIFAR(100, args.layers, args.nodes, args.channels, args.keep_prob, args.drop_path_keep_prob,
                        args.use_aux_head, args.steps, args.arch)
-    model = model.cuda()
+    
     train_criterion = nn.CrossEntropyLoss().cuda()
     eval_criterion = nn.CrossEntropyLoss().cuda()
     logging.info("param size = %fMB", utils.count_parameters_in_MB(model))
+    logging.info("multi adds = %fMB", model.multi_adds / 1000000)
 
     optimizer = torch.optim.SGD(
         model.parameters(),
@@ -189,7 +191,6 @@ def main():
     
     args.steps = int(np.ceil(50000 / args.batch_size)) * args.epochs
     logging.info("Args = %s", args)
-    logging.info("multi adds = %fMB", model.multi_adds / 1000000)
     
     _, model_state_dict, epoch, step, optimizer_state_dict, best_acc_top1 = utils.load(args.output_dir)
     build_fn = get_builder(args.dataset)

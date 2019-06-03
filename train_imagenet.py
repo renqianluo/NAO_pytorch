@@ -181,7 +181,7 @@ def build_imagenet(model_state_dict, optimizer_state_dict, **kwargs):
 
     model = NASNetworkImageNet(1000, args.layers, args.nodes, args.channels, args.keep_prob,
                        args.drop_path_keep_prob, args.use_aux_head, args.steps, args.arch)
-    model = model.cuda()
+    
     train_criterion = CrossEntropyLabelSmooth(1000, args.label_smooth).cuda()
     eval_criterion = nn.CrossEntropyLoss().cuda()
     logging.info("param size = %fMB", utils.count_parameters_in_MB(model))
