@@ -58,7 +58,7 @@ class NAO(nn.Module):
     def init_parameters(self):
         for w in self.parameters():
             if w.data.dim() >= 2:
-                nn.init.uniform(w.data, -INITRANGE, INITRANGE)
+                nn.init.uniform_(w.data, -INITRANGE, INITRANGE)
     
     def flatten_parameters(self):
         self.encoder.rnn.flatten_parameters()
