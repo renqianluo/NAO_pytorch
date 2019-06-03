@@ -2,7 +2,7 @@ import logging
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-from operations import WSAvgPool2d, WSMaxPool2d, WSReLUConvBN, WSBN, WSSepConv, FactorizedReduce, MaybeCalibrateSize, AuxHeadCIFAR, AuxHeadImageNet， apply_drop_path
+from operations import WSAvgPool2d, WSMaxPool2d, WSReLUConvBN, WSBN, WSSepConv, FactorizedReduce, MaybeCalibrateSize, AuxHeadCIFAR, AuxHeadImageNet, apply_drop_path
 
 
 class Node(nn.Module):
