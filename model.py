@@ -248,6 +248,7 @@ class NASNetworkCIFAR(nn.Module):
             nn.BatchNorm2d(channels)
         )
         outs = [[32, 32, channels],[32, 32, channels]]
+        self.multi_adds += 3 * 3 * 3 * channels * 32 * 32
         channels = self.channels
         self.cells = nn.ModuleList()
         for i in range(self.layers+2):
@@ -256,6 +257,7 @@ class NASNetworkCIFAR(nn.Module):
             else:
                 channels *= 2
                 cell = Cell(self.reduc_arch, outs, channels, True, i, self.layers+2, self.steps, self.drop_path_keep_prob)
+            self.multi_adds += cell.multi_adds
             self.cells.append(cell)
             outs = [outs[-1], cell.out_shape]
             
@@ -333,12 +335,11 @@ class NASNetworkImageNet(nn.Module):
             if i not in self.pool_layers:
                 cell = Cell(self.conv_arch, outs, channels, False, i, self.layers + 2, self.steps,
                             self.drop_path_keep_prob)
-                self.multi_adds += cell.multi_adds
             else:
                 channels *= 2
                 cell = Cell(self.reduc_arch, outs, channels, True, i, self.layers + 2, self.steps,
                             self.drop_path_keep_prob)
-                self.multi_adds += cell.multi_adds
+            self.multi_adds += cell.multi_adds
             self.cells.append(cell)
             outs = [outs[-1], cell.out_shape]
             
