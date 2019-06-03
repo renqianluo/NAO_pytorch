@@ -39,7 +39,7 @@ parser.add_argument('--drop_path_keep_prob', type=float, default=0.8)
 parser.add_argument('--l2_reg', type=float, default=3e-4)
 parser.add_argument('--arch', type=str, default=None)
 parser.add_argument('--use_aux_head', action='store_true', default=False)
-parser.add_argument('--seed', type=int, default=None)
+parser.add_argument('--seed', type=int, default=0)
 args = parser.parse_args()
 
 utils.create_exp_dir(args.output_dir, scripts_to_save=glob.glob('*.py'))
