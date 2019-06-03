@@ -115,8 +115,8 @@ def get_builder(dataset):
 def build_cifar10(model_state_dict, optimizer_state_dict, **kwargs):
     epoch = kwargs.pop('epoch')
     train_transform, valid_transform = utils._data_transforms_cifar10(args.cutout_size)
-    train_data = dset.CIFAR10(root=args.data_path, train=True, download=True, transform=train_transform)
-    valid_data = dset.CIFAR10(root=args.data_path, train=False, download=True, transform=valid_transform)
+    train_data = dset.CIFAR10(root=args.data, train=True, download=True, transform=train_transform)
+    valid_data = dset.CIFAR10(root=args.data, train=False, download=True, transform=valid_transform)
     
     train_queue = torch.utils.data.DataLoader(
         train_data, batch_size=args.batch_size, shuffle=True, pin_memory=True, num_workers=16)
@@ -148,8 +148,8 @@ def build_cifar10(model_state_dict, optimizer_state_dict, **kwargs):
 def build_cifar100(model_state_dict, optimizer_state_dict, **kwargs):
     epoch = kwargs.pop('epoch')
     train_transform, valid_transform = utils._data_transforms_cifar10(args.cutout_size)
-    train_data = dset.CIFAR100(root=args.data_path, train=True, download=True, transform=train_transform)
-    valid_data = dset.CIFAR10(root=args.data_path, train=False, download=True, transform=valid_transform)
+    train_data = dset.CIFAR100(root=args.data, train=True, download=True, transform=train_transform)
+    valid_data = dset.CIFAR10(root=args.data, train=False, download=True, transform=valid_transform)
 
     train_queue = torch.utils.data.DataLoader(
         train_data, batch_size=args.batch_size, shuffle=True, pin_memory=True, num_workers=16)
