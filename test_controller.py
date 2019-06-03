@@ -13,7 +13,6 @@ import torch.utils
 import torch.nn.functional as F
 import torchvision.datasets as dset
 import torch.backends.cudnn as cudnn
-from model_search import NASNetwork
 from controller import NAO
 
 
