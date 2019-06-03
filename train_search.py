@@ -422,7 +422,7 @@ def main():
 
     child_eval_epochs = eval(args.child_eval_epochs)
     build_fn = get_builder(args.dataset)
-    train_queue, valid_queue, model, train_criterion, eval_criterion, optimizer, scheduler = build_fn(ratio=0.9, epoch=0)
+    train_queue, valid_queue, model, train_criterion, eval_criterion, optimizer, scheduler = build_fn(ratio=0.9, epoch=-1)
 
     nao = NAO(
         args.controller_encoder_layers,
