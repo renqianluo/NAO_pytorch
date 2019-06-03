@@ -299,7 +299,7 @@ class NASNetworkImageNet(nn.Module):
             x.data.copy_(y.data)
         return model_new
     
-    def forward(self, input, arch, step=None, bn_train=bn_train):
+    def forward(self, input, arch, step=None, bn_train=False):
         aux_logits = None
         conv_arch, reduc_arch = arch
         s0 = self.stem0(input)
