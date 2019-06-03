@@ -405,11 +405,11 @@ def save(model_path, args, model, epoch, step, optimizer, best_acc_top1, is_best
         'best_acc_top1': best_acc_top1,
     }
     filename = os.path.join(model_path, 'checkpoint{}.pt'.format(epoch))
-    newest_filename = os.path.join(model_path, 'checkpoint.pt')
     torch.save(state_dict, filename)
+    newest_filename = os.path.join(model_path, 'checkpoint.pt')
     shutil.copyfile(filename, newest_filename)
     if is_best:
-        best_filename = os.path.join(save, 'checkpoint_best.pt')
+        best_filename = os.path.join(model_path, 'checkpoint_best.pt')
         shutil.copyfile(filename, best_filename)
   
 
