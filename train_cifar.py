@@ -74,7 +74,7 @@ def train(train_queue, model, optimizer, global_step, criterion):
         top1.update(prec1.data, n)
         top5.update(prec5.data, n)
     
-        if step % 100 == 0:
+        if (step+1) % 100 == 0:
             logging.info('train %03d loss %e top1 %f top5 %f', step, objs.avg, top1.avg, top5.avg)
 
     return top1.avg, objs.avg, global_step
@@ -99,7 +99,7 @@ def valid(valid_queue, model, criterion):
             top1.update(prec1.data, n)
             top5.update(prec5.data, n)
         
-            if step % 100 == 0:
+            if (step+1) % 100 == 0:
                 logging.info('valid %03d %e %f %f', step, objs.avg, top1.avg, top5.avg)
 
     return top1.avg, objs.avg

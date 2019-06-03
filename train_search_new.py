@@ -421,7 +421,7 @@ def main():
             child_arch_pool = archs
 
     build_fn = get_builder(args.dataset)
-    train_queue, valid_queue, model, train_criterion, eval_criterion, optimizer, scheduler = build_fn(ratio=0.9, epoch=0)
+    train_queue, valid_queue, model, train_criterion, eval_criterion, optimizer, scheduler = build_fn(ratio=0.9, epoch=-1)
 
     step = 0
     for epoch in range(1, args.child_epochs + 1):

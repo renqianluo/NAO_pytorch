@@ -293,9 +293,9 @@ def child_train(train_queue, model, optimizer, global_step, arch_pool, arch_pool
         
         prec1, prec5 = utils.accuracy(logits, target, topk=(1, 5))
         n = input.size(0)
-        objs.update(loss.data[0], n)
-        top1.update(prec1.data[0], n)
-        top5.update(prec5.data[0], n)
+        objs.update(loss.data, n)
+        top1.update(prec1.data, n)
+        top5.update(prec5.data, n)
         
         if step % 100 == 0:
             logging.info('Train %03d loss %e top1 %f top5 %f', step, objs.avg, top1.avg, top5.avg)
@@ -318,7 +318,7 @@ def child_valid(valid_queue, model, arch_pool, criterion):
             loss = criterion(logits, targets)
                 
             prec1, prec5 = utils.accuracy(logits, targets, topk=(1, 5))
-            valid_acc_list.append(prec1.data[0]/100)
+            valid_acc_list.append(prec1.data/100)
             
             if (i+1) % 100 == 0:
                 logging.info('Valid arch %s\n loss %.2f top1 %f top5 %f', ' '.join(map(str, arch[0] + arch[1])), loss, prec1, prec5)
@@ -352,9 +352,9 @@ def nao_train(train_queue, model, optimizer):
         optimizer.step()
         
         n = encoder_input.size(0)
-        objs.update(loss.data[0], n)
-        mse.update(loss_1.data[0], n)
-        nll.update(loss_2.data[0], n)
+        objs.update(loss.data, n)
+        mse.update(loss_1.data, n)
+        nll.update(loss_2.data, n)
         
     return objs.avg, mse.avg, nll.avg
 
