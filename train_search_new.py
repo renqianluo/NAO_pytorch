@@ -17,7 +17,7 @@ import torch.backends.cudnn as cudnn
 from model_search import NASNetworkCIFAR, NASNetworkImageNet
 from controller import NAO
 
-parser = argparse.ArgumentParser(description='NAO CIFAR-10')
+parser = argparse.ArgumentParser(description='NAO Search')
 
 # Basic model parameters.
 parser.add_argument('--mode', type=str, default='train', choices=['train', 'test'])
@@ -49,10 +49,7 @@ parser.add_argument('--child_label_smooth', type=float, default=0.1, help='label
 parser.add_argument('--child_gamma', type=float, default=0.97, help='learning rate decay')
 parser.add_argument('--child_decay_period', type=int, default=1, help='epochs between two learning rate decays')
 parser.add_argument('--controller_seed_arch', type=int, default=1000)
-parser.add_argument('--controller_discard', action='store_true', default=False)
 parser.add_argument('--controller_new_arch', type=int, default=300)
-parser.add_argument('--controller_random_arch', type=int, default=100)
-parser.add_argument('--controller_replace', action='store_true', default=False)
 parser.add_argument('--controller_encoder_layers', type=int, default=1)
 parser.add_argument('--controller_encoder_hidden_size', type=int, default=96)
 parser.add_argument('--controller_encoder_emb_size', type=int, default=48)
@@ -63,7 +60,7 @@ parser.add_argument('--controller_decoder_hidden_size', type=int, default=96)
 parser.add_argument('--controller_source_length', type=int, default=40)
 parser.add_argument('--controller_encoder_length', type=int, default=20)
 parser.add_argument('--controller_decoder_length', type=int, default=40)
-parser.add_argument('--controller_encoder_dropout', type=float, default=0.1)
+parser.add_argument('--controller_encoder_dropout', type=float, default=0)
 parser.add_argument('--controller_mlp_dropout', type=float, default=0.1)
 parser.add_argument('--controller_decoder_dropout', type=float, default=0.0)
 parser.add_argument('--controller_l2_reg', type=float, default=1e-4)
@@ -296,9 +293,9 @@ def child_train(train_queue, model, optimizer, global_step, arch_pool, arch_pool
         
         prec1, prec5 = utils.accuracy(logits, target, topk=(1, 5))
         n = input.size(0)
-        objs.update(loss.data[0], n)
-        top1.update(prec1.data[0], n)
-        top5.update(prec5.data[0], n)
+        objs.update(loss.data, n)
+        top1.update(prec1.data, n)
+        top5.update(prec5.data, n)
         
         if step % 100 == 0:
             logging.info('Train %03d loss %e top1 %f top5 %f', step, objs.avg, top1.avg, top5.avg)
@@ -321,7 +318,7 @@ def child_valid(valid_queue, model, arch_pool, criterion):
             loss = criterion(logits, targets)
                 
             prec1, prec5 = utils.accuracy(logits, targets, topk=(1, 5))
-            valid_acc_list.append(prec1.data[0]/100)
+            valid_acc_list.append(prec1.data/100)
             
             if (i+1) % 100 == 0:
                 logging.info('Valid arch %s\n loss %.2f top1 %f top5 %f', ' '.join(map(str, arch[0] + arch[1])), loss, prec1, prec5)
@@ -355,9 +352,9 @@ def nao_train(train_queue, model, optimizer):
         optimizer.step()
         
         n = encoder_input.size(0)
-        objs.update(loss.data[0], n)
-        mse.update(loss_1.data[0], n)
-        nll.update(loss_2.data[0], n)
+        objs.update(loss.data, n)
+        mse.update(loss_1.data, n)
+        nll.update(loss_2.data, n)
         
     return objs.avg, mse.avg, nll.avg
 
@@ -385,14 +382,14 @@ def nao_valid(queue, model):
     return pa.avg, hs.avg
 
 
-def nao_infer(queue, model, step):
+def nao_infer(queue, model, step, direction='+'):
     new_arch_list = []
     model.eval()
     for i, sample in enumerate(queue):
         encoder_input = sample['encoder_input']
         encoder_input = encoder_input.cuda().requires_grad_()
         model.zero_grad()
-        new_arch = model.generate_new_arch(encoder_input, step)
+        new_arch = model.generate_new_arch(encoder_input, step, direction=direction)
         new_arch_list.extend(new_arch.data.squeeze().tolist())
     return new_arch_list
 
@@ -426,6 +423,15 @@ def main():
     build_fn = get_builder(args.dataset)
     train_queue, valid_queue, model, train_criterion, eval_criterion, optimizer, scheduler = build_fn(ratio=0.9, epoch=0)
 
+    step = 0
+    for epoch in range(1, args.child_epochs + 1):
+        scheduler.step()
+        lr = scheduler.get_lr()[0]
+        logging.info('epoch %d lr %e', epoch, lr)
+        # sample an arch to train
+        train_acc, train_obj, step = child_train(train_queue, model, optimizer, step, None, None, train_criterion)
+        logging.info('train_acc %f', train_acc)
+
     nao = NAO(
         args.controller_encoder_layers,
         args.controller_encoder_vocab_size,
@@ -446,30 +452,22 @@ def main():
     nao = nao.cuda()
     logging.info("param size = %fMB", utils.count_parameters_in_MB(nao))
 
-    step = 0
-    for epoch in range(1, args.child_epochs + 1):
-        scheduler.step()
-        lr = scheduler.get_lr()[0]
-        logging.info('epoch %d lr %e', epoch, lr)
-        # sample an arch to train
-        train_acc, train_obj, step = child_train(train_queue, model, optimizer, step, None, None, train_criterion)
-        logging.info('train_acc %f', train_acc)
-    
+    new_arch_pool = utils.generate_arch(args.controller_seed_arch, args.child_nodes, 5)
+    arch_pool = []
+    arch_pool_valid_acc = []
     for i in range(3):
-        child_arch_pool = utils.generate_arch(args.controller_seed_arch, args.child_nodes, 5)
         # Evaluate seed archs
-        valid_accuracy_list = child_valid(valid_queue, model, child_arch_pool, eval_criterion)
+        new_arch_pool_valid_acc = child_valid(valid_queue, model, new_arch_pool, eval_criterion)
 
-        # Output archs and evaluated error rate
-        old_archs = child_arch_pool
-        old_archs_perf = [1 - i for i in valid_accuracy_list]
+        arch_pool += new_arch_pool
+        arch_pool_valid_acc += new_arch_pool_valid_acc
 
-        old_archs_sorted_indices = np.argsort(old_archs_perf)
-        old_archs = np.array(old_archs)[old_archs_sorted_indices].tolist()
-        old_archs_perf = np.array(old_archs_perf)[old_archs_sorted_indices].tolist()
+        arch_pool_valid_acc_list_sorted_indices = np.argsort(arch_pool_valid_acc)[::-1]
+        arch_pool = np.array(arch_pool)[arch_pool_valid_acc_list_sorted_indices].tolist()
+        arch_pool_valid_acc_list = np.array(arch_pool_valid_acc_list)[arch_pool_valid_acc_list_sorted_indices].tolist()
         with open(os.path.join(args.output_dir, 'arch_pool.{}'.format(i)), 'w') as fa:
             with open(os.path.join(args.output_dir, 'arch_pool.perf.{}'.format(i)), 'w') as fp:
-                for arch, perf in zip(old_archs, old_archs_perf):
+                for arch, perf in zip(arch_pool, arch_pool_valid_acc_list):
                     arch = ' '.join(map(str, arch[0] + arch[1]))
                     fa.write('{}\n'.format(arch))
                     fp.write('{}\n'.format(perf))
@@ -477,11 +475,11 @@ def main():
 
         # Train Encoder-Predictor-Decoder
         logging.info('Training Encoder-Predictor-Decoder for {} time'.format(i))
-        encoder_input = list(map(lambda x: utils.parse_arch_to_seq(x[0], 2) + utils.parse_arch_to_seq(x[1], 2), old_archs))
+        encoder_input = list(map(lambda x: utils.parse_arch_to_seq(x[0], 2) + utils.parse_arch_to_seq(x[1], 2), arch_pool))
         # [[conv, reduc]]
-        min_val = min(old_archs_perf)
-        max_val = max(old_archs_perf)
-        encoder_target = [(i - min_val) / (max_val - min_val) for i in old_archs_perf]
+        min_val = min(arch_pool_valid_acc_list)
+        max_val = max(arch_pool_valid_acc_list)
+        encoder_target = [(i - min_val) / (max_val - min_val) for i in arch_pool_valid_acc_list]
 
         nao_train_dataset = utils.NAODataset(encoder_input, encoder_target, True, swap=True)
         nao_valid_dataset = utils.NAODataset(encoder_input, encoder_target, False)
@@ -509,7 +507,7 @@ def main():
         while len(new_archs) < args.controller_new_arch:
             predict_step_size += 1
             logging.info('Generate new architectures with step size %d', predict_step_size)
-            new_arch = nao_infer(nao_infer_queue, nao, predict_step_size)
+            new_arch = nao_infer(nao_infer_queue, nao, predict_step_size, direction='+')
             for arch in new_arch:
                 if arch not in encoder_input and arch not in new_archs:
                     new_archs.append(arch)
@@ -519,18 +517,9 @@ def main():
             if predict_step_size > max_step_size:
                 break
                 # [[conv, reduc]]
-        new_archs = list(map(lambda x: utils.parse_seq_to_arch(x, 2), new_archs))  # [[[conv],[reduc]]]
+        new_arch_pool = list(map(lambda x: utils.parse_seq_to_arch(x, 2), new_archs))  # [[[conv],[reduc]]]
         num_new_archs = len(new_archs)
-        logging.info("Generate %d new archs", num_new_archs)
-        if args.controller_replace:
-            new_arch_pool = old_archs[:len(old_archs) - (num_new_archs + args.controller_random_arch)] + \
-                            new_archs + utils.generate_arch(args.controller_random_arch, 5, 5)
-        elif args.controller_discard:
-            new_arch_pool = old_archs[:100] + new_archs + utils.generate_arch(args.controller_random_arch, 5, 5)
-        else:
-            new_arch_pool = old_archs + new_archs + utils.generate_arch(args.controller_random_arch, 5, 5)
-        logging.info("Totally %d architectures now to train", len(new_arch_pool))
-        child_arch_pool = new_arch_pool
+        logging.info("Generate %d new archs", new_arch_pool)
   
 
 if __name__ == '__main__':

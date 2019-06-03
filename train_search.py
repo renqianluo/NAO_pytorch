@@ -382,14 +382,14 @@ def nao_valid(queue, model):
     return pa.avg, hs.avg
 
 
-def nao_infer(queue, model, step):
+def nao_infer(queue, model, step, direction='+'):
     new_arch_list = []
     model.eval()
     for i, sample in enumerate(queue):
         encoder_input = sample['encoder_input']
         encoder_input = encoder_input.cuda().requires_grad_()
         model.zero_grad()
-        new_arch = model.generate_new_arch(encoder_input, step)
+        new_arch = model.generate_new_arch(encoder_input, step, direction=direction)
         new_arch_list.extend(new_arch.data.squeeze().tolist())
     return new_arch_list
 
@@ -450,14 +450,7 @@ def main():
         child_arch_pool = utils.generate_arch(args.controller_seed_arch, args.child_nodes, 5)  # [[[conv],[reduc]]]
         child_arch_pool_prob = None
     else:
-        if args.child_sample_policy == 'uniform':
-            child_arch_pool_prob = None
-        elif args.child_sample_policy == 'params':
-            child_arch_pool_prob = calculate_params(child_arch_pool)
-        elif args.child_sample_policy == 'valid_performance':
-            child_arch_pool_prob = child_valid(valid_queue, model, child_arch_pool)
-        else:
-            raise ValueError('Child model arch pool sample policy is not provided!')
+        child_arch_pool_prob = None
 
     eval_points = utils.generate_eval_points(child_eval_epochs, 0, args.child_epochs)
     step = 0
@@ -476,9 +469,9 @@ def main():
 
         # Output archs and evaluated error rate
         old_archs = child_arch_pool
-        old_archs_perf = [1 - i for i in valid_accuracy_list]
+        old_archs_perf = valid_accuracy_list
 
-        old_archs_sorted_indices = np.argsort(old_archs_perf)
+        old_archs_sorted_indices = np.argsort(old_archs_perf)[::-1]
         old_archs = np.array(old_archs)[old_archs_sorted_indices].tolist()
         old_archs_perf = np.array(old_archs_perf)[old_archs_sorted_indices].tolist()
         with open(os.path.join(args.output_dir, 'arch_pool.{}'.format(epoch)), 'w') as fa:
@@ -529,7 +522,7 @@ def main():
         while len(new_archs) < args.controller_new_arch:
             predict_step_size += 1
             logging.info('Generate new architectures with step size %d', predict_step_size)
-            new_arch = nao_infer(nao_infer_queue, nao, predict_step_size)
+            new_arch = nao_infer(nao_infer_queue, nao, predict_step_size, direction='+')
             for arch in new_arch:
                 if arch not in encoder_input and arch not in new_archs:
                     new_archs.append(arch)

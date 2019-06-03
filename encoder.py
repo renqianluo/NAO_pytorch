@@ -69,10 +69,15 @@ class Encoder(nn.Module):
         predict_value = F.sigmoid(out)
         return encoder_outputs, encoder_state, arch_emb, predict_value
     
-    def infer(self, x, predict_lambda):
+    def infer(self, x, predict_lambda, direction='-'):
         encoder_outputs, encoder_state, arch_emb, predict_value = self(x)
         grads_on_outputs = torch.autograd.grad(predict_value, encoder_outputs, torch.ones_like(predict_value))[0]
-        new_encoder_outputs = encoder_outputs - predict_lambda * grads_on_outputs
+        if direction == '+':
+            new_encoder_outputs = encoder_outputs + predict_lambda * grads_on_outputs
+        elif direction == '-':
+            new_encoder_outputs = encoder_outputs - predict_lambda * grads_on_outputs
+        else:
+            raise ValueError('Direction must be + or -, got {} instead'.format(direction))
         new_encoder_outputs = F.normalize(new_encoder_outputs, 2, dim=-1)
         new_arch_emb = torch.mean(new_encoder_outputs, dim=1)
         new_arch_emb = F.normalize(new_arch_emb, 2, dim=-1)
