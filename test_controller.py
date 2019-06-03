@@ -122,8 +122,11 @@ def nao_infer(queue, model, step):
 
 def main():
     arch_pool = utils.generate_arch(args.controller_seed_arch, 5, 5)
-    encoder_input = list(map(lambda x: utils.parse_arch_to_seq(x[0], 2) + utils.parse_arch_to_seq(x[1], 2), arch_pool))
-    encoder_target = [np.random.random() for i in range(args.controller_seed_arch)]
+    valid_arch_pool = utils.generate_arch(100, 5, 5)
+    train_encoder_input = list(map(lambda x: utils.parse_arch_to_seq(x[0], 2) + utils.parse_arch_to_seq(x[1], 2), arch_pool))
+    train_encoder_target = [np.random.random() for i in range(args.controller_seed_arch)]
+    valid_encoder_target = [np.random.random() for i in range(100)]
+    valid_encoder_input = list(map(lambda x: utils.parse_arch_to_seq(x[0], 2) + utils.parse_arch_to_seq(x[1], 2), valid_arch_pool))
     nao = NAO(
         args.controller_encoder_layers,
         args.controller_encoder_vocab_size,
@@ -143,8 +146,8 @@ def main():
     )
     logging.info("param size = %fMB", utils.count_parameters_in_MB(nao))
     nao = nao.cuda()
-    nao_train_dataset = utils.NAODataset(encoder_input, encoder_target, True, swap=True)
-    nao_valid_dataset = utils.NAODataset(encoder_input, encoder_target, False)
+    nao_train_dataset = utils.NAODataset(train_encoder_input, train_encoder_target, True, swap=True)
+    nao_valid_dataset = utils.NAODataset(valid_encoder_input, valid_encoder_target, False)
     nao_train_queue = torch.utils.data.DataLoader(
         nao_train_dataset, batch_size=args.controller_batch_size, shuffle=True, pin_memory=True)
     nao_valid_queue = torch.utils.data.DataLoader(
@@ -156,7 +159,7 @@ def main():
             logging.info("epoch %04d train loss %.6f mse %.6f ce %.6f", nao_epoch, nao_loss, nao_mse, nao_ce)
         if nao_epoch % 100 == 0:
             pa, hs = nao_valid(nao_valid_queue, nao)
-            logging.info("Evaluation on training data\n")
+            logging.info("Evaluation on training data")
             logging.info('epoch %04d pairwise accuracy %.6f hamming distance %.6f', nao_epoch, pa, hs)
 
     new_archs = []
@@ -170,7 +173,7 @@ def main():
         logging.info('Generate new architectures with step size %d', predict_step_size)
         new_arch = nao_infer(nao_infer_queue, nao, predict_step_size)
         for arch in new_arch:
-            if arch not in encoder_input and arch not in new_archs:
+            if arch not in train_encoder_input and arch not in new_archs:
                 new_archs.append(arch)
             if len(new_archs) >= args.controller_new_arch:
                 break
