@@ -10,9 +10,17 @@ EOS_ID = 0
 
 
 class Attention(nn.Module):
-    def __init__(self, dim):
+    def __init__(self, input_dim, source_dim=None, output_dim=None, bias=False):
         super(Attention, self).__init__()
-        self.linear_out = nn.Linear(dim * 2, dim)
+        if source_dim is None:
+            source_dim = input_dim
+        if output_dim is None:
+            output_dim = input_dim
+        self.input_dim = input_dim
+        self.source_dim = source_dim
+        self.output_dim = output_dim
+        self.input_proj = nn.Linear(input_dim, source_dim, bias=bias)
+        self.output_proj = nn.Linear(input_dim + source_dim, output_dim, bias=bias)
         self.mask = None
         
         self.init_parameters()
@@ -25,23 +33,26 @@ class Attention(nn.Module):
     def set_mask(self, mask):
         self.mask = mask
     
-    def forward(self, output, context):
-        batch_size = output.size(0)
-        hidden_size = output.size(2)
-        input_size = context.size(1)
-        # (batch, out_len, dim) * (batch, in_len, dim) -> (batch, out_len, in_len)
-        attn = torch.bmm(output, context.transpose(1, 2))
+    def forward(self, input, source_hids):
+        batch_size = input.size(0)
+        source_len = source_hids.size(1)
+
+        # (batch, tgt_len, input_dim) -> (batch, tgt_len, source_dim)
+        x = self.input_proj(input)
+
+        # (batch, tgt_len, source_dim) * (batch, src_len, source_dim) -> (batch, tgt_len, src_len)
+        attn = torch.bmm(x, source_hids.transpose(1, 2))
         if self.mask is not None:
             attn.data.masked_fill_(self.mask, -float('inf'))
-        attn = F.softmax(attn.view(-1, input_size), dim=1).view(batch_size, -1, input_size)
+        attn = F.softmax(attn.view(-1, source_len), dim=1).view(batch_size, -1, source_len)
         
-        # (batch, out_len, in_len) * (batch, in_len, dim) -> (batch, out_len, dim)
-        mix = torch.bmm(attn, context)
+        # (batch, tgt_len, src_len) * (batch, src_len, source_dim) -> (batch, tgt_len, source_dim)
+        mix = torch.bmm(attn, source_hids)
         
-        # concat -> (batch, out_len, 2*dim)
-        combined = torch.cat((mix, output), dim=2)
-        # output -> (batch, out_len, dim)
-        output = F.tanh(self.linear_out(combined.view(-1, 2 * hidden_size))).view(batch_size, -1, hidden_size)
+        # concat -> (batch, tgt_len, source_dim + input_dim)
+        combined = torch.cat((mix, input), dim=2)
+        # output -> (batch, tgt_len, output_dim)
+        output = F.tanh(self.output_proj(combined.view(-1, self.input_dim + self.source_dim))).view(batch_size, -1, self.output_dim)
         
         return output, attn
 
