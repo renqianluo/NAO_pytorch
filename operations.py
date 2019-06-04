@@ -4,6 +4,7 @@ import torch.nn.functional as F
 from torch import Tensor
 
 INPLACE=False
+BIAS=False
 
 
 def apply_drop_path(x, drop_path_keep_prob, layer_id, layers, step, steps):
@@ -109,10 +110,10 @@ class Conv(nn.Module):
             k1, k2 = kernel_size[0], kernel_size[1]
             self.ops = nn.Sequential(
                 nn.ReLU(inplace=INPLACE),
-                nn.Conv2d(C_out, C_out, (k1, k2), stride=stride, padding=padding[0], bias=False),
+                nn.Conv2d(C_out, C_out, (k1, k2), stride=(1, stride), padding=padding[0], bias=False),
                 nn.BatchNorm2d(C_out, affine=affine),
                 nn.ReLU(inplace=INPLACE),
-                nn.Conv2d(C_out, C_out, (k2, k1), stride=1, padding=padding[1], bias=False),
+                nn.Conv2d(C_out, C_out, (k2, k1), stride=(stride, 1), padding=padding[1], bias=False),
                 nn.BatchNorm2d(C_out, affine=affine),
             )
 
@@ -325,20 +326,18 @@ class FinalCombine(nn.Module):
         self.ops = nn.ModuleList()
         self.concat_fac_op_dict = {}
         self.multi_adds = 0
-        for i, layer in enumerate(layers):
-            if i in concat:
-                hw = layer[0]
-                if hw > out_hw:
-                    assert hw == 2 * out_hw and i in [0,1]
-                    self.concat_fac_op_dict[i] = len(self.ops)
-                    self.ops.append(FactorizedReduce(layer[-1], channels, affine))
-                    self.multi_adds += 1 * 1 * layer[-1] * channels * out_hw * out_hw
+        for i in concat:
+            hw = layers[i][0]
+            if hw > out_hw:
+                assert hw == 2 * out_hw and i in [0,1]
+                self.concat_fac_op_dict[i] = len(self.ops)
+                self.ops.append(FactorizedReduce(layers[i][-1], channels, affine))
+                self.multi_adds += 1 * 1 * layers[i][-1] * channels * out_hw * out_hw
         
     def forward(self, states, bn_train=False):
-        for i, state in enumerate(states):
-            if i in self.concat:
-                if i in self.concat_fac_op_dict:
-                    states[i] = self.ops[self.concat_fac_op_dict[i]](state, bn_train)
+        for i in self.concat:
+            if i in self.concat_fac_op_dict:
+                states[i] = self.ops[self.concat_fac_op_dict[i]](states[i], bn_train)
         out = torch.cat([states[i] for i in self.concat], dim=1)
         return out
 
