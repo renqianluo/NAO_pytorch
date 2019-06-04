@@ -198,8 +198,8 @@ class Cell(nn.Module):
             self.used[y_id] += 1
             prev_layers.append(node.out_shape)
         
-        self.concat = [i for i in range(self.nodes+2) if self.used[i] != 0]
-        out_hw = min([shape[0] for i, shape in enumerate(prev_layers) if self.used[i] == 0])
+        self.concat = [i for i in range(self.nodes+2) if self.used[i] == 0]
+        out_hw = min([shape[0] for i, shape in enumerate(prev_layers) if i in self.concat])
         self.final_combine = FinalCombine(prev_layers, out_hw, channels, self.concat)
         self.out_shape = [out_hw, out_hw, channels * len(self.concat)]
         self.multi_adds += self.final_combine.multi_adds
