@@ -26,7 +26,7 @@ parser.add_argument('--dataset', type=str, default='cifar10', choices=['cifar10,
 parser.add_argument('--output_dir', type=str, default='models')
 parser.add_argument('--batch_size', type=int, default=160)
 parser.add_argument('--eval_batch_size', type=int, default=500)
-parser.add_argument('--epochs', type=int, default=6000)
+parser.add_argument('--epochs', type=int, default=600)
 parser.add_argument('--layers', type=int, default=6)
 parser.add_argument('--nodes', type=int, default=5)
 parser.add_argument('--channels', type=int, default=128)
