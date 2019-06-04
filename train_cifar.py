@@ -129,7 +129,7 @@ def build_cifar10(model_state_dict, optimizer_state_dict, **kwargs):
     train_criterion = nn.CrossEntropyLoss().cuda()
     eval_criterion = nn.CrossEntropyLoss().cuda()
     logging.info("param size = %fMB", utils.count_parameters_in_MB(model))
-    logging.info("multi adds = %fMB", model.multi_adds / 1000000)
+    logging.info("multi adds = %fM", model.multi_adds / 1000000)
 
     optimizer = torch.optim.SGD(
         model.parameters(),
@@ -162,7 +162,7 @@ def build_cifar100(model_state_dict, optimizer_state_dict, **kwargs):
     train_criterion = nn.CrossEntropyLoss().cuda()
     eval_criterion = nn.CrossEntropyLoss().cuda()
     logging.info("param size = %fMB", utils.count_parameters_in_MB(model))
-    logging.info("multi adds = %fMB", model.multi_adds / 1000000)
+    logging.info("multi adds = %fM", model.multi_adds / 1000000)
 
     optimizer = torch.optim.SGD(
         model.parameters(),
