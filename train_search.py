@@ -309,7 +309,7 @@ def child_valid(valid_queue, model, arch_pool, criterion):
     with torch.no_grad():
         model.eval()
         for i, arch in enumerate(arch_pool):
-            # for step, (input, target) in enumerate(valid_queue):
+            #for step, (inputs, targets) in enumerate(valid_queue):
             inputs, targets = next(iter(valid_queue))
             inputs = inputs.cuda()
             targets = targets.cuda()
