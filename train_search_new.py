@@ -21,7 +21,7 @@ parser = argparse.ArgumentParser(description='NAO Search')
 
 # Basic model parameters.
 parser.add_argument('--mode', type=str, default='train', choices=['train', 'test'])
-parser.add_argument('--data_path', type=str, default='./data')
+parser.add_argument('--data', type=str, default='data')
 parser.add_argument('--dataset', type=str, default='cifar10', choices=['cifar10, cifar100, imagenet'])
 parser.add_argument('--zip_file', action='store_true', default=False)
 parser.add_argument('--lazy_load', action='store_true', default=False)
@@ -110,8 +110,8 @@ def build_cifar10(model_state_dict, optimizer_state_dict, **kwargs):
     epoch = kwargs.pop('epoch')
     ratio = kwargs.pop('ratio')
     train_transform, valid_transform = utils._data_transforms_cifar10(args.child_cutout_size)
-    train_data = dset.CIFAR10(root=args.data_path, train=True, download=True, transform=train_transform)
-    valid_data = dset.CIFAR10(root=args.data_path, train=True, download=True, transform=valid_transform)
+    train_data = dset.CIFAR10(root=args.data, train=True, download=True, transform=train_transform)
+    valid_data = dset.CIFAR10(root=args.data, train=True, download=True, transform=valid_transform)
 
     num_train = len(train_data)
     assert num_train == len(valid_data)
@@ -153,8 +153,8 @@ def build_cifar100(model_state_dict, optimizer_state_dict, **kwargs):
     epoch = kwargs.pop('epoch')
     ratio = kwargs.pop('ratio')
     train_transform, valid_transform = utils._data_transforms_cifar10(args.cutout_size)
-    train_data = dset.CIFAR100(root=args.data_path, train=True, download=True, transform=train_transform)
-    valid_data = dset.CIFAR100(root=args.data_path, train=True, download=True, transform=valid_transform)
+    train_data = dset.CIFAR100(root=args.data, train=True, download=True, transform=train_transform)
+    valid_data = dset.CIFAR100(root=args.data, train=True, download=True, transform=valid_transform)
 
     num_train = len(train_data)
     assert num_train == len(valid_data)
