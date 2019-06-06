@@ -407,18 +407,19 @@ def main():
     args.steps = int(np.ceil(50000 / args.child_batch_size)) * args.child_epochs
 
     logging.info("args = %s", args)
+    arch_pool = []
     if args.child_arch_pool is not None:
         logging.info('Architecture pool is provided, loading')
         with open(args.child_arch_pool) as f:
             archs = f.read().splitlines()
             archs = list(map(utils.build_dag, archs))
-            child_arch_pool = archs
+            arch_pool = archs
     if os.path.exists(os.path.join(args.output_dir, 'arch_pool')):
         logging.info('Architecture pool is founded, loading')
         with open(os.path.join(args.output_dir, 'arch_pool')) as f:
             archs = f.read().splitlines()
             archs = list(map(utils.build_dag, archs))
-            child_arch_pool = archs
+            arch_pool = archs
 
     build_fn = get_builder(args.dataset)
     train_queue, valid_queue, model, train_criterion, eval_criterion, optimizer, scheduler = build_fn(ratio=0.9, epoch=-1)
@@ -453,9 +454,8 @@ def main():
     logging.info("param size = %fMB", utils.count_parameters_in_MB(nao))
 
     new_arch_pool = utils.generate_arch(args.controller_seed_arch, args.child_nodes, 5)
-    arch_pool = []
     arch_pool_valid_acc = []
-    for i in range(3):
+    for i in range(3+1):
         # Evaluate seed archs
         new_arch_pool_valid_acc = child_valid(valid_queue, model, new_arch_pool, eval_criterion)
 
@@ -471,6 +471,8 @@ def main():
                     arch = ' '.join(map(str, arch[0] + arch[1]))
                     fa.write('{}\n'.format(arch))
                     fp.write('{}\n'.format(perf))
+        if i == 3:
+            break
                             
 
         # Train Encoder-Predictor-Decoder
@@ -500,7 +502,7 @@ def main():
         new_archs = []
         max_step_size = 50
         predict_step_size = 0
-        top100_archs = list(map(lambda x: utils.parse_arch_to_seq(x[0], 2) + utils.parse_arch_to_seq(x[1], 2), old_archs[:100]))
+        top100_archs = list(map(lambda x: utils.parse_arch_to_seq(x[0], 2) + utils.parse_arch_to_seq(x[1], 2), arch_pool[:100]))
         nao_infer_dataset = utils.NAODataset(top100_archs, None, False)
         nao_infer_queue = torch.utils.data.DataLoader(
             nao_infer_dataset, batch_size=len(nao_infer_dataset), shuffle=False, pin_memory=True)
@@ -518,8 +520,7 @@ def main():
                 break
                 # [[conv, reduc]]
         new_arch_pool = list(map(lambda x: utils.parse_seq_to_arch(x, 2), new_archs))  # [[[conv],[reduc]]]
-        num_new_archs = len(new_archs)
-        logging.info("Generate %d new archs", new_arch_pool)
+        logging.info("Generate %d new archs", len(new_arch_pool))
   
 
 if __name__ == '__main__':
