@@ -462,12 +462,12 @@ def main():
         arch_pool += new_arch_pool
         arch_pool_valid_acc += new_arch_pool_valid_acc
 
-        arch_pool_valid_acc_list_sorted_indices = np.argsort(arch_pool_valid_acc)[::-1]
-        arch_pool = np.array(arch_pool)[arch_pool_valid_acc_list_sorted_indices].tolist()
-        arch_pool_valid_acc_list = np.array(arch_pool_valid_acc_list)[arch_pool_valid_acc_list_sorted_indices].tolist()
+        arch_pool_valid_acc_sorted_indices = np.argsort(arch_pool_valid_acc)[::-1]
+        arch_pool = np.array(arch_pool)[arch_pool_valid_acc_sorted_indices].tolist()
+        arch_pool_valid_acc = np.array(arch_pool_valid_acc)[arch_pool_valid_acc_sorted_indices].tolist()
         with open(os.path.join(args.output_dir, 'arch_pool.{}'.format(i)), 'w') as fa:
             with open(os.path.join(args.output_dir, 'arch_pool.perf.{}'.format(i)), 'w') as fp:
-                for arch, perf in zip(arch_pool, arch_pool_valid_acc_list):
+                for arch, perf in zip(arch_pool, arch_pool_valid_acc):
                     arch = ' '.join(map(str, arch[0] + arch[1]))
                     fa.write('{}\n'.format(arch))
                     fp.write('{}\n'.format(perf))
@@ -479,9 +479,9 @@ def main():
         logging.info('Training Encoder-Predictor-Decoder for {} time'.format(i))
         encoder_input = list(map(lambda x: utils.parse_arch_to_seq(x[0], 2) + utils.parse_arch_to_seq(x[1], 2), arch_pool))
         # [[conv, reduc]]
-        min_val = min(arch_pool_valid_acc_list)
-        max_val = max(arch_pool_valid_acc_list)
-        encoder_target = [(i - min_val) / (max_val - min_val) for i in arch_pool_valid_acc_list]
+        min_val = min(arch_pool_valid_acc)
+        max_val = max(arch_pool_valid_acc)
+        encoder_target = [(i - min_val) / (max_val - min_val) for i in arch_pool_valid_acc]
 
         nao_train_dataset = utils.NAODataset(encoder_input, encoder_target, True, swap=True)
         nao_valid_dataset = utils.NAODataset(encoder_input, encoder_target, False)
