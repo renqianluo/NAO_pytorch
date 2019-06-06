@@ -106,7 +106,7 @@ def get_builder(dataset):
         return build_imagenet
     
 
-def build_cifar10(model_state_dict, optimizer_state_dict, **kwargs):
+def build_cifar10(model_state_dict=None, optimizer_state_dict=None, **kwargs):
     epoch = kwargs.pop('epoch')
     ratio = kwargs.pop('ratio')
     train_transform, valid_transform = utils._data_transforms_cifar10(args.child_cutout_size)
@@ -149,7 +149,7 @@ def build_cifar10(model_state_dict, optimizer_state_dict, **kwargs):
     return train_queue, valid_queue, model, train_criterion, eval_criterion, optimizer, scheduler
 
 
-def build_cifar100(model_state_dict, optimizer_state_dict, **kwargs):
+def build_cifar100(model_state_dict=None, optimizer_state_dict=None, **kwargs):
     epoch = kwargs.pop('epoch')
     ratio = kwargs.pop('ratio')
     train_transform, valid_transform = utils._data_transforms_cifar10(args.cutout_size)
