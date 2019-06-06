@@ -30,7 +30,7 @@ parser.add_argument('--seed', type=int, default=None)
 parser.add_argument('--child_sample_policy', type=str, default=None)
 parser.add_argument('--child_batch_size', type=int, default=160)
 parser.add_argument('--child_eval_batch_size', type=int, default=500)
-parser.add_argument('--child_epochs', type=int, default=100)
+parser.add_argument('--child_epochs', type=int, default=30)
 parser.add_argument('--child_layers', type=int, default=2)
 parser.add_argument('--child_nodes', type=int, default=5)
 parser.add_argument('--child_channels', type=int, default=20)
@@ -42,7 +42,6 @@ parser.add_argument('--child_keep_prob', type=float, default=0.8)
 parser.add_argument('--child_drop_path_keep_prob', type=float, default=1.0)
 parser.add_argument('--child_l2_reg', type=float, default=3e-4)
 parser.add_argument('--child_use_aux_head', action='store_true', default=False)
-parser.add_argument('--child_eval_epochs', type=str, default='20')
 parser.add_argument('--child_arch_pool', type=str, default=None)
 parser.add_argument('--child_lr', type=float, default=0.1)
 parser.add_argument('--child_label_smooth', type=float, default=0.1, help='label smoothing')
@@ -407,7 +406,7 @@ def main():
     args.steps = int(np.ceil(50000 / args.child_batch_size)) * args.child_epochs
 
     logging.info("args = %s", args)
-    arch_pool = []
+    
     if args.child_arch_pool is not None:
         logging.info('Architecture pool is provided, loading')
         with open(args.child_arch_pool) as f:
@@ -420,18 +419,6 @@ def main():
             archs = f.read().splitlines()
             archs = list(map(utils.build_dag, archs))
             arch_pool = archs
-
-    build_fn = get_builder(args.dataset)
-    train_queue, valid_queue, model, train_criterion, eval_criterion, optimizer, scheduler = build_fn(ratio=0.9, epoch=-1)
-
-    step = 0
-    for epoch in range(1, args.child_epochs + 1):
-        scheduler.step()
-        lr = scheduler.get_lr()[0]
-        logging.info('epoch %d lr %e', epoch, lr)
-        # sample an arch to train
-        train_acc, train_obj, step = child_train(train_queue, model, optimizer, step, None, None, train_criterion)
-        logging.info('train_acc %f', train_acc)
 
     nao = NAO(
         args.controller_encoder_layers,
@@ -451,16 +438,31 @@ def main():
         args.controller_decoder_length,
     )
     nao = nao.cuda()
-    logging.info("param size = %fMB", utils.count_parameters_in_MB(nao))
+    logging.info("Encoder-Predictor-Decoder param size = %fMB", utils.count_parameters_in_MB(nao))
 
-    new_arch_pool = utils.generate_arch(args.controller_seed_arch, args.child_nodes, 5)
+    build_fn = get_builder(args.dataset)
+    arch_pool = []
     arch_pool_valid_acc = []
-    for i in range(3+1):
-        # Evaluate seed archs
-        new_arch_pool_valid_acc = child_valid(valid_queue, model, new_arch_pool, eval_criterion)
+    for i in range(4):
+        if args.child_arch_pool is None:
+            logging.info('Architecture pool is not provided, randomly generating now')
+            child_arch_pool = utils.generate_arch(args.controller_seed_arch, args.child_nodes, 5)  # [[[conv],[reduc]]]
+        train_queue, valid_queue, model, train_criterion, eval_criterion, optimizer, scheduler = build_fn(ratio=0.9, epoch=-1)
+        step = 0
+        for epoch in range(1, args.child_epochs + 1):
+            scheduler.step()
+            lr = scheduler.get_lr()[0]
+            logging.info('epoch %d lr %e', epoch, lr)
+            # sample an arch to train
+            train_acc, train_obj, step = child_train(train_queue, model, optimizer, step, child_arch_pool, None, train_criterion)
+            logging.info('train_acc %f', train_acc)
 
-        arch_pool += new_arch_pool
-        arch_pool_valid_acc += new_arch_pool_valid_acc
+
+        # Evaluate seed archs
+        child_arch_pool_valid_acc = child_valid(valid_queue, model, child_arch_pool, eval_criterion)
+
+        arch_pool += child_arch_pool
+        arch_pool_valid_acc += child_arch_pool_valid_acc
 
         arch_pool_valid_acc_sorted_indices = np.argsort(arch_pool_valid_acc)[::-1]
         arch_pool = np.array(arch_pool)[arch_pool_valid_acc_sorted_indices].tolist()
@@ -519,8 +521,8 @@ def main():
             if predict_step_size > max_step_size:
                 break
                 # [[conv, reduc]]
-        new_arch_pool = list(map(lambda x: utils.parse_seq_to_arch(x, 2), new_archs))  # [[[conv],[reduc]]]
-        logging.info("Generate %d new archs", len(new_arch_pool))
+        child_arch_pool = list(map(lambda x: utils.parse_seq_to_arch(x, 2), new_archs))  # [[[conv],[reduc]]]
+        logging.info("Generate %d new archs", len(child_arch_pool))
   
 
 if __name__ == '__main__':
