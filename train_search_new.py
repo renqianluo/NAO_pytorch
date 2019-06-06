@@ -278,7 +278,7 @@ def child_train(train_queue, model, optimizer, global_step, arch_pool, arch_pool
         optimizer.zero_grad()
         # sample an arch to train
         if arch_pool is None:
-            arch = utils.generate_arch(1, args.child_nodes, 5)  # [[[conv],[reduc]]]
+            arch = utils.generate_arch(1, args.child_nodes, 5)[0]  # [[[conv],[reduc]]]
         else:
             arch = utils.sample_arch(arch_pool, arch_pool_prob)
         logits, aux_logits = model(input, arch, global_step)
