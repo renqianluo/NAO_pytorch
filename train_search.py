@@ -26,7 +26,7 @@ parser.add_argument('--dataset', type=str, default='cifar10', choices=['cifar10,
 parser.add_argument('--zip_file', action='store_true', default=False)
 parser.add_argument('--lazy_load', action='store_true', default=False)
 parser.add_argument('--output_dir', type=str, default='models')
-parser.add_argument('--seed', type=int, default=None)
+parser.add_argument('--seed', type=int, default=0)
 parser.add_argument('--child_sample_policy', type=str, default=None)
 parser.add_argument('--child_batch_size', type=int, default=160)
 parser.add_argument('--child_eval_batch_size', type=int, default=500)
