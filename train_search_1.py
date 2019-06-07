@@ -412,13 +412,13 @@ def main():
         with open(args.child_arch_pool) as f:
             archs = f.read().splitlines()
             archs = list(map(utils.build_dag, archs))
-            arch_pool = archs
+            child_arch_pool = archs
     if os.path.exists(os.path.join(args.output_dir, 'arch_pool')):
         logging.info('Architecture pool is founded, loading')
         with open(os.path.join(args.output_dir, 'arch_pool')) as f:
             archs = f.read().splitlines()
             archs = list(map(utils.build_dag, archs))
-            arch_pool = archs
+            child_arch_pool = archs
 
     nao = NAO(
         args.controller_encoder_layers,
@@ -441,9 +441,6 @@ def main():
     logging.info("Encoder-Predictor-Decoder param size = %fMB", utils.count_parameters_in_MB(nao))
 
     build_fn = get_builder(args.dataset)
-    if args.child_arch_pool is None:
-            logging.info('Architecture pool is not provided, randomly generating now')
-            child_arch_pool = utils.generate_arch(args.controller_seed_arch, args.child_nodes, 5)  # [[[conv],[reduc]]]
     arch_pool = []
     arch_pool_valid_acc = []
     for i in range(4):

@@ -23,8 +23,10 @@ class Node(nn.Module):
         self.steps = steps
         self.x_id = x_id
         self.x_op_id = x_op
+        self.x_id_fact_reduce = None
         self.y_id = y_id
         self.y_op_id = y_op
+        self.y_id_fact_reduce = None
         self.multi_adds = 0
         x_shape = list(x_shape)
         y_shape = list(y_shape)
@@ -48,13 +50,13 @@ class Node(nn.Module):
             self.x_op = OPERATIONS[x_op]()
             if x_stride > 1:
                 assert x_stride == 2
-                self.x_op.add_module('id_fact_reduce', FactorizedReduce(x_shape[-1], channels))
+                self.x_id_fact_reduce = FactorizedReduce(x_shape[-1], channels)
                 x_shape = [x_shape[0] // x_stride, x_shape[1] // x_stride, channels]
         elif x_op == 5:
             self.x_op = OPERATIONS_large[x_op]()
             if x_stride > 1:
                 assert x_stride == 2
-                self.x_op.add_module('id_fact_reduce', FactorizedReduce(x_shape[-1], channels))
+                self.x_id_fact_reduce = FactorizedReduce(x_shape[-1], channels)
                 x_shape = [x_shape[0] // x_stride, x_shape[1] // x_stride, channels]
         elif x_op == 6:
             self.x_op = OPERATIONS_large[x_op](channels, channels, 1, x_stride, 0)
@@ -108,13 +110,13 @@ class Node(nn.Module):
             self.y_op = OPERATIONS[y_op]()
             if y_stride > 1:
                 assert y_stride == 2
-                self.y_op.add_module('id_fact_reduce', FactorizedReduce(y_shape[-1], channels))
+                self.y_id_fact_reduce = FactorizedReduce(y_shape[-1], channels)
                 y_shape = [y_shape[0] // y_stride, y_shape[1] // y_stride, channels]
         elif y_op == 5:
             self.y_op = OPERATIONS_large[y_op]()
             if y_stride > 1:
                 assert y_stride == 2
-                self.y_op.add_module('id_fact_reduce', FactorizedReduce(y_shape[-1], channels))
+                self.y_id_fact_reduce = FactorizedReduce(y_shape[-1], channels)
                 y_shape = [y_shape[0] // y_stride, y_shape[1] // y_stride, channels]
         elif y_op == 6:
             self.y_op = OPERATIONS_large[y_op](channels, channels, 1, y_stride, 0)
@@ -154,11 +156,15 @@ class Node(nn.Module):
         if self.x_op_id in [10, 13]:
             x = F.pad(x, [0, 1, 0, 1])
         x = self.x_op(x)
+        if self.x_id_fact_reduce is not None:
+            x = self.x_id_fact_reduce(x)
         if self.x_id not in [4, 5] and self.drop_path_keep_prob is not None and self.training:
             x = apply_drop_path(x, self.drop_path_keep_prob, self.layer_id, self.layers, step, self.steps)
         if self.y_op_id in [10, 13]:
             y = F.pad(y, [0, 1, 0, 1])
         y = self.y_op(y)
+        if self.y_id_fact_reduce is not None:
+            y = self.y_id_fact_reduce(y)
         if self.y_id not in [4, 5] and self.drop_path_keep_prob is not None and self.training:
             y = apply_drop_path(y, self.drop_path_keep_prob, self.layer_id, self.layers, step, self.steps)
         out = x + y
