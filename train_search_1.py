@@ -441,12 +441,12 @@ def main():
     logging.info("Encoder-Predictor-Decoder param size = %fMB", utils.count_parameters_in_MB(nao))
 
     build_fn = get_builder(args.dataset)
+    if args.child_arch_pool is None:
+            logging.info('Architecture pool is not provided, randomly generating now')
+            child_arch_pool = utils.generate_arch(args.controller_seed_arch, args.child_nodes, 5)  # [[[conv],[reduc]]]
     arch_pool = []
     arch_pool_valid_acc = []
     for i in range(4):
-        if args.child_arch_pool is None:
-            logging.info('Architecture pool is not provided, randomly generating now')
-            child_arch_pool = utils.generate_arch(args.controller_seed_arch, args.child_nodes, 5)  # [[[conv],[reduc]]]
         train_queue, valid_queue, model, train_criterion, eval_criterion, optimizer, scheduler = build_fn(ratio=0.9, epoch=-1)
         step = 0
         for epoch in range(1, args.child_epochs + 1):
