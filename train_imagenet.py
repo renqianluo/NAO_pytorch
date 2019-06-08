@@ -181,6 +181,13 @@ def build_imagenet(model_state_dict, optimizer_state_dict, **kwargs):
 
     model = NASNetworkImageNet(1000, args.layers, args.nodes, args.channels, args.keep_prob,
                        args.drop_path_keep_prob, args.use_aux_head, args.steps, args.arch)
+    if model_state_dict is not None:
+        model.load_state_dict(model_state_dict)
+
+    if torch.cuda.device_count() > 1:
+        logging.info("Use %d %s", torch.cuda.device_count(), "GPUs !")
+        model = nn.DataParallel(model)
+    model = model.cuda()
     
     train_criterion = CrossEntropyLabelSmooth(1000, args.label_smooth).cuda()
     eval_criterion = nn.CrossEntropyLoss().cuda()
@@ -193,10 +200,9 @@ def build_imagenet(model_state_dict, optimizer_state_dict, **kwargs):
         momentum=0.9,
         weight_decay=args.l2_reg,
     )
-    if model_state_dict is not None:
-        model.load_state_dict(model_state_dict)
     if optimizer_state_dict is not None:
         optimizer.load_state_dict(optimizer_state_dict)
+
     scheduler = torch.optim.lr_scheduler.StepLR(optimizer, args.decay_period, args.gamma, epoch)
     return train_queue, valid_queue, model, train_criterion, eval_criterion, optimizer, scheduler
 
@@ -216,11 +222,6 @@ def main():
     
     _, model_state_dict, epoch, step, optimizer_state_dict, best_acc_top1 = utils.load(args.output_dir)
     train_queue, valid_queue, model, train_criterion, eval_criterion, optimizer, scheduler = build_imagenet(model_state_dict, optimizer_state_dict, epoch=epoch-1)
-    
-    if torch.cuda.device_count() > 1:
-        logging.info("Use %d GPUs !", torch.cuda.device_count())
-        model = nn.DataParallel(model)
-    model = model.cuda()
 
     while epoch < args.epochs:
         scheduler.step()
