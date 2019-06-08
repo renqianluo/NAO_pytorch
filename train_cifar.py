@@ -114,6 +114,7 @@ def get_builder(dataset):
 
 def build_cifar10(model_state_dict, optimizer_state_dict, **kwargs):
     epoch = kwargs.pop('epoch')
+    
     train_transform, valid_transform = utils._data_transforms_cifar10(args.cutout_size)
     train_data = dset.CIFAR10(root=args.data, train=True, download=True, transform=train_transform)
     valid_data = dset.CIFAR10(root=args.data, train=False, download=True, transform=valid_transform)
@@ -125,7 +126,14 @@ def build_cifar10(model_state_dict, optimizer_state_dict, **kwargs):
     
     model = NASNetworkCIFAR(10, args.layers, args.nodes, args.channels, args.keep_prob, args.drop_path_keep_prob,
                        args.use_aux_head, args.steps, args.arch)
-    
+    if model_state_dict is not None:
+        model.load_state_dict(model_state_dict)
+
+    if torch.cuda.device_count() > 1:
+        logging.info("Use %d %s", torch.cuda.device_count(), "GPUs !")
+        model = nn.DataParallel(model)
+    model = model.cuda()
+
     train_criterion = nn.CrossEntropyLoss().cuda()
     eval_criterion = nn.CrossEntropyLoss().cuda()
     logging.info("param size = %fMB", utils.count_parameters_in_MB(model))
@@ -137,16 +145,16 @@ def build_cifar10(model_state_dict, optimizer_state_dict, **kwargs):
         momentum=0.9,
         weight_decay=args.l2_reg,
     )
-    if model_state_dict is not None:
-        model.load_state_dict(model_state_dict)
     if optimizer_state_dict is not None:
         optimizer.load_state_dict(optimizer_state_dict)
+
     scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, float(args.epochs), args.lr_min, epoch)
     return train_queue, valid_queue, model, train_criterion, eval_criterion, optimizer, scheduler
 
 
 def build_cifar100(model_state_dict, optimizer_state_dict, **kwargs):
     epoch = kwargs.pop('epoch')
+
     train_transform, valid_transform = utils._data_transforms_cifar10(args.cutout_size)
     train_data = dset.CIFAR100(root=args.data, train=True, download=True, transform=train_transform)
     valid_data = dset.CIFAR10(root=args.data, train=False, download=True, transform=valid_transform)
@@ -158,7 +166,14 @@ def build_cifar100(model_state_dict, optimizer_state_dict, **kwargs):
     
     model = NASNetworkCIFAR(100, args.layers, args.nodes, args.channels, args.keep_prob, args.drop_path_keep_prob,
                        args.use_aux_head, args.steps, args.arch)
-    
+    if model_state_dict is not None:
+        model.load_state_dict(model_state_dict)
+
+    if torch.cuda.device_count() > 1:
+        logging.info("Use %d %s", torch.cuda.device_count(), "GPUs !")
+        model = nn.DataParallel(model)
+    model = model.cuda()
+
     train_criterion = nn.CrossEntropyLoss().cuda()
     eval_criterion = nn.CrossEntropyLoss().cuda()
     logging.info("param size = %fMB", utils.count_parameters_in_MB(model))
@@ -170,10 +185,10 @@ def build_cifar100(model_state_dict, optimizer_state_dict, **kwargs):
         momentum=0.9,
         weight_decay=args.l2_reg,
     )
-    if model_state_dict is not None:
-        model.load_state_dict(model_state_dict)
+    
     if optimizer_state_dict is not None:
         optimizer.load_state_dict(optimizer_state_dict)
+
     scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, float(args.epochs), args.lr_min, epoch)
     return train_queue, valid_queue, model, train_criterion, eval_criterion, optimizer, scheduler
 
@@ -195,11 +210,6 @@ def main():
     _, model_state_dict, epoch, step, optimizer_state_dict, best_acc_top1 = utils.load(args.output_dir)
     build_fn = get_builder(args.dataset)
     train_queue, valid_queue, model, train_criterion, eval_criterion, optimizer, scheduler = build_fn(model_state_dict, optimizer_state_dict, epoch=epoch-1)
-    
-    if torch.cuda.device_count() > 1:
-        logging.info("Use %d %s", torch.cuda.device_count(), "GPUs !")
-        model = nn.DataParallel(model)
-    model = model.cuda()
 
     while epoch < args.epochs:
         scheduler.step()
