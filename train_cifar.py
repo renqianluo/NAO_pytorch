@@ -24,7 +24,7 @@ parser.add_argument('--mode', type=str, default='train',
 parser.add_argument('--data', type=str, default='data/cifar10')
 parser.add_argument('--dataset', type=str, default='cifar10', choices=['cifar10, cifar100'])
 parser.add_argument('--output_dir', type=str, default='models')
-parser.add_argument('--batch_size', type=int, default=160)
+parser.add_argument('--batch_size', type=int, default=128)
 parser.add_argument('--eval_batch_size', type=int, default=500)
 parser.add_argument('--epochs', type=int, default=600)
 parser.add_argument('--layers', type=int, default=6)
@@ -39,6 +39,7 @@ parser.add_argument('--drop_path_keep_prob', type=float, default=0.8)
 parser.add_argument('--l2_reg', type=float, default=3e-4) #use 4e-5?
 parser.add_argument('--arch', type=str, default=None)
 parser.add_argument('--use_aux_head', action='store_true', default=False)
+parser.add_argument('--relu_before_cl', action='store_true', default=False)
 parser.add_argument('--seed', type=int, default=0)
 args = parser.parse_args()
 
@@ -124,7 +125,7 @@ def build_cifar10(model_state_dict, optimizer_state_dict, **kwargs):
     valid_queue = torch.utils.data.DataLoader(
         valid_data, batch_size=args.eval_batch_size, shuffle=False, pin_memory=True, num_workers=16)
     
-    model = NASNetworkCIFAR(10, args.layers, args.nodes, args.channels, args.keep_prob, args.drop_path_keep_prob,
+    model = NASNetworkCIFAR(args, 10, args.layers, args.nodes, args.channels, args.keep_prob, args.drop_path_keep_prob,
                        args.use_aux_head, args.steps, args.arch)
     logging.info("param size = %fMB", utils.count_parameters_in_MB(model))
     logging.info("multi adds = %fM", model.multi_adds / 1000000)
@@ -164,7 +165,7 @@ def build_cifar100(model_state_dict, optimizer_state_dict, **kwargs):
     valid_queue = torch.utils.data.DataLoader(
         valid_data, batch_size=args.eval_batch_size, shuffle=False, pin_memory=True, num_workers=16)
     
-    model = NASNetworkCIFAR(100, args.layers, args.nodes, args.channels, args.keep_prob, args.drop_path_keep_prob,
+    model = NASNetworkCIFAR(args, 100, args.layers, args.nodes, args.channels, args.keep_prob, args.drop_path_keep_prob,
                        args.use_aux_head, args.steps, args.arch)
     logging.info("param size = %fMB", utils.count_parameters_in_MB(model))
     logging.info("multi adds = %fM", model.multi_adds / 1000000)

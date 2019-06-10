@@ -179,7 +179,7 @@ def build_imagenet(model_state_dict, optimizer_state_dict, **kwargs):
     valid_queue = torch.utils.data.DataLoader(
         valid_data, batch_size=args.batch_size, shuffle=True, pin_memory=True, num_workers=16)
 
-    model = NASNetworkImageNet(1000, args.layers, args.nodes, args.channels, args.keep_prob,
+    model = NASNetworkImageNet(args, 1000, args.layers, args.nodes, args.channels, args.keep_prob,
                        args.drop_path_keep_prob, args.use_aux_head, args.steps, args.arch)
     logging.info("param size = %fMB", utils.count_parameters_in_MB(model))
     logging.info("multi adds = %fM", model.multi_adds / 1000000)

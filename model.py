@@ -224,8 +224,9 @@ class Cell(nn.Module):
         
 
 class NASNetworkCIFAR(nn.Module):
-    def __init__(self, classes, layers, nodes, channels, keep_prob, drop_path_keep_prob, use_aux_head, steps, arch):
+    def __init__(self, args, classes, layers, nodes, channels, keep_prob, drop_path_keep_prob, use_aux_head, steps, arch):
         super(NASNetworkCIFAR, self).__init__()
+        self.args = args
         self.classes = classes
         self.layers = layers
         self.nodes = nodes
@@ -234,6 +235,7 @@ class NASNetworkCIFAR(nn.Module):
         self.drop_path_keep_prob = drop_path_keep_prob
         self.use_aux_head = use_aux_head
         self.steps = steps
+        self.relu_before_cl = args.relu_before_cl
         arch = list(map(int, arch.strip().split()))
         self.conv_arch = arch[:4 * self.nodes]
         self.reduc_arch = arch[4 * self.nodes:]
@@ -267,7 +269,8 @@ class NASNetworkCIFAR(nn.Module):
             if self.use_aux_head and i == self.aux_head_index:
                 self.auxiliary_head = AuxHeadCIFAR(outs[-1][-1], classes)
         
-        #self.relu = nn.ReLU(inplace=False)
+        if self.relu_before_cl:
+            self.relu = nn.ReLU(inplace=False)
         self.global_pooling = nn.AdaptiveAvgPool2d(1)
         self.dropout = nn.Dropout(1 - self.keep_prob)
         self.classifier = nn.Linear(outs[-1][-1], classes)
@@ -287,7 +290,8 @@ class NASNetworkCIFAR(nn.Module):
             if self.use_aux_head and i == self.aux_head_index and self.training:
                 aux_logits = self.auxiliary_head(s1)
         out = s1
-        #out = self.relu(s1)
+        if self.relu_before_cl:
+            out = self.relu(out)
         out = self.global_pooling(out)
         out = self.dropout(out)
         logits = self.classifier(out.view(out.size(0), -1))
@@ -295,8 +299,9 @@ class NASNetworkCIFAR(nn.Module):
 
 
 class NASNetworkImageNet(nn.Module):
-    def __init__(self, classes, layers, nodes, channels, keep_prob, drop_path_keep_prob, use_aux_head, steps, arch):
+    def __init__(self, args, classes, layers, nodes, channels, keep_prob, drop_path_keep_prob, use_aux_head, steps, arch):
         super(NASNetworkImageNet, self).__init__()
+        self.args = args
         self.classes = classes
         self.layers = layers
         self.nodes = nodes
@@ -349,7 +354,8 @@ class NASNetworkImageNet(nn.Module):
             if self.use_aux_head and i == self.aux_head_index:
                 self.auxiliary_head = AuxHeadImageNet(outs[-1][-1], classes)
         
-        #self.relu = nn.ReLU(inplace=False)
+        if self.relu_before_cl:
+            self.relu = nn.ReLU(inplace=False)
         self.global_pooling = nn.AdaptiveAvgPool2d(1)
         self.dropout = nn.Dropout(1 - self.keep_prob)
         self.classifier = nn.Linear(outs[-1][-1], classes)
@@ -371,7 +377,8 @@ class NASNetworkImageNet(nn.Module):
                 aux_logits = self.auxiliary_head(s1)
         
         out = s1
-        #out = self.relu(s1)
+        if self.relu_before_cl:
+            out = self.relu(out)
         out = self.global_pooling(out)
         out = self.dropout(out)
         logits = self.classifier(out.view(out.size(0), -1))
