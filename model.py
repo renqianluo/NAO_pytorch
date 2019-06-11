@@ -174,7 +174,7 @@ class Node(nn.Module):
 class Cell(nn.Module):
     def __init__(self, arch, prev_layers, channels, reduction, layer_id, layers, steps, drop_path_keep_prob=None):
         super(Cell, self).__init__()
-        print(prev_layers)
+        #print(prev_layers)
         assert len(prev_layers) == 2
         self.arch = arch
         self.reduction = reduction
