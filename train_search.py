@@ -593,11 +593,13 @@ def main():
         else:
             new_arch_pool = old_archs + new_archs + utils.generate_arch(args.controller_random_arch, 5, 5)
         logging.info("Totally %d architectures now to train", len(new_arch_pool))
+        
         child_arch_pool = new_arch_pool
         with open(os.path.join(args.output_dir, 'arch_pool'), 'w') as f:
             for arch in new_arch_pool:
                 arch = ' '.join(map(str, arch[0] + arch[1]))
                 f.write('{}\n'.format(arch))
+
         if args.child_sample_policy == 'params':
             child_arch_pool_prob = []
             for arch in child_arch_pool:

@@ -452,7 +452,6 @@ def main():
     arch_pool_valid_acc = []
     args.relu_before_cl = False
     for i in range(4):
-        step = 0
         if args.child_sample_policy == 'params':
             child_arch_pool_prob = []
             for arch in child_arch_pool:
@@ -469,6 +468,8 @@ def main():
                 del tmp_model
         else:
             child_arch_pool_prob = None
+
+        step = 0
         for epoch in range(1, args.child_epochs + 1):
             scheduler.step()
             lr = scheduler.get_lr()[0]
@@ -568,7 +569,7 @@ def main():
             logging.info('%d new archs generated now', len(new_archs))
             if predict_step_size > max_step_size:
                 break
-                # [[conv, reduc]]
+
         child_arch_pool = list(map(lambda x: utils.parse_seq_to_arch(x, 2), new_archs))  # [[[conv],[reduc]]]
         logging.info("Generate %d new archs", len(child_arch_pool))
   
