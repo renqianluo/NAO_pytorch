@@ -402,7 +402,7 @@ def main():
     cudnn.enabled = True
     torch.cuda.manual_seed(args.seed)
     
-    args.steps = int(np.ceil(50000 / args.child_batch_size)) * args.child_epochs
+    args.steps = int(np.ceil(45000 / args.child_batch_size)) * args.child_epochs
 
     logging.info("args = %s", args)
     
@@ -446,6 +446,7 @@ def main():
 
     
     if child_arch_pool is None:
+        logging.info('Architecture pool is not provided, randomly generating now')
         child_arch_pool = utils.generate_arch(args.controller_seed_arch, args.child_nodes, 5)  # [[[conv],[reduc]]]
     arch_pool = []
     arch_pool_valid_acc = []
@@ -511,10 +512,10 @@ def main():
             split = int(n*ratio)
             np.random.shuffle(dataset)
             encoder_input, encoder_target = list(zip(*dataset))
-            train_encoder_input = encoder_input[:split]
-            train_encoder_target = encoder_target[:split]
-            valid_encoder_input = encoder_input[split:]
-            valid_encoder_target = encoder_target[split:]
+            train_encoder_input = list(encoder_input[:split])
+            train_encoder_target = list(encoder_target[:split])
+            valid_encoder_input = list(encoder_input[split:])
+            valid_encoder_target = list(encoder_target[split:])
             for _ in range(args.controller_expand-1):
                 for src, tgt in zip(encoder_input[:split], encoder_target[:split]):
                     a = np.random.randint(0, args.child_nodes)

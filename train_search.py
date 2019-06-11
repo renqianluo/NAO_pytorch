@@ -406,7 +406,7 @@ def main():
     cudnn.enabled = True
     torch.cuda.manual_seed(args.seed)
     
-    args.steps = int(np.ceil(50000 / args.child_batch_size)) * args.child_epochs
+    args.steps = int(np.ceil(45000 / args.child_batch_size)) * args.child_epochs
 
     logging.info("args = %s", args)
 
@@ -447,7 +447,7 @@ def main():
         args.controller_decoder_length,
     )
     nao = nao.cuda()
-    logging.info("param size = %fMB", utils.count_parameters_in_MB(nao))
+    logging.info("Encoder-Predictor-Decoder param size = %fMB", utils.count_parameters_in_MB(nao))
 
     args.relu_before_cl = False
     # Train child model
@@ -522,10 +522,10 @@ def main():
             split = int(n*ratio)
             np.random.shuffle(dataset)
             encoder_input, encoder_target = list(zip(*dataset))
-            train_encoder_input = encoder_input[:split]
-            train_encoder_target = encoder_target[:split]
-            valid_encoder_input = encoder_input[split:]
-            valid_encoder_target = encoder_target[split:]
+            train_encoder_input = list(encoder_input[:split])
+            train_encoder_target = list(encoder_target[:split])
+            valid_encoder_input = list(encoder_input[split:])
+            valid_encoder_target = list(encoder_target[split:])
             for _ in range(args.controller_expand-1):
                 for src, tgt in zip(encoder_input[:split], encoder_target[:split]):
                     a = np.random.randint(0, args.child_nodes)
