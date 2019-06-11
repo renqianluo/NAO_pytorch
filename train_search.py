@@ -514,39 +514,39 @@ def main():
         encoder_target = [(i - min_val) / (max_val - min_val) for i in old_archs_perf]
 
         if args.controller_expand is not None:
-            src_buffers = []
-            tgt_buffers = []
+            dataset = list(zip(encoder_input, encoder_target))
+            n = len(dataset)
+            ratio = 0.9
+            split = int(n*ratio)
+            np.random.shuffle(dataset)
+            encoder_input, encoder_target = list(zip(*dataset))
+            train_encoder_input = encoder_input[:split]
+            train_encoder_target = encoder_target[:split]
+            valid_encoder_input = encoder_input[split:]
+            valid_encoder_target = encoder_target[split:]
             for _ in range(args.controller_expand-1):
-                for src, tgt in zip(encoder_input, encoder_target):
-                    a = np.random.randint(0, 5)
-                    b = np.random.randint(0, 5)
+                for src, tgt in zip(encoder_input[:split], encoder_target[:split]):
+                    a = np.random.randint(0, args.child_nodes)
+                    b = np.random.randint(0, args.child_nodes)
                     src = src[:4 * a] + src[4 * a + 2:4 * a + 4] + \
                             src[4 * a:4 * a + 2] + src[4 * (a + 1):20 + 4 * b] + \
                             src[20 + 4 * b + 2:20 + 4 * b + 4] + src[20 + 4 * b:20 + 4 * b + 2] + \
                             src[20 + 4 * (b + 1):]
-                    src_buffers.append(src)
-                    tgt_buffers.append(tgt)
-            encoder_input = encoder_input + src_buffers
-            encoder_target = encoder_target + tgt_buffers
-            n = len(encoder_input)
-            indices = list(range(n))
-            np.random.shuffle(indices)
-            split = int(np.floor(0.9 * n))
-            train_indices = sorted(indices[:split])
-            valid_indices = sorted(indices[split:]) 
+                    train_encoder_input.append(src)
+                    train_encoder_target.append(tgt)
         else:
-            train_indices = list(range(len(encoder_input)))
-            valid_indices = list(range(len(encoder_input)))
-        logging.info('Train data: {}\tValid data: {}'.format(len(train_indices), len(valid_indices)))
-            
-        nao_train_dataset = utils.NAODataset(encoder_input, encoder_target, True, swap=True if args.controller_expand is None else False)
-        nao_valid_dataset = utils.NAODataset(encoder_input, encoder_target, False)
+            train_encoder_input = encoder_input
+            train_encoder_target = encoder_target
+            valid_encoder_input = encoder_input
+            valid_encoder_target = encoder_target
+        logging.info('Train data: {}\tValid data: {}'.format(len(train_encoder_input), len(train_encoder_target)))
+
+        nao_train_dataset = utils.NAODataset(train_encoder_input, train_encoder_target, True, swap=True if args.controller_expand is None else False)
+        nao_valid_dataset = utils.NAODataset(valid_encoder_input, valid_encoder_target, False)
         nao_train_queue = torch.utils.data.DataLoader(
-            nao_train_dataset, batch_size=args.controller_batch_size,
-            sampler=torch.utils.data.sampler.SubsetRandomSampler(train_indices), pin_memory=True)
+            nao_train_dataset, batch_size=args.controller_batch_size, shuffle=True, pin_memory=True)
         nao_valid_queue = torch.utils.data.DataLoader(
-            nao_valid_dataset, batch_size=len(nao_valid_dataset),
-            sampler=torch.utils.data.sampler.SubsetRandomSampler(valid_indices), pin_memory=True)
+            nao_valid_dataset, batch_size=args.controller_batch_size, shuffle=False, pin_memory=True)
         nao_optimizer = torch.optim.Adam(nao.parameters(), lr=args.controller_lr, weight_decay=args.controller_l2_reg)
         for nao_epoch in range(1, args.controller_epochs+1):
             nao_loss, nao_mse, nao_ce = nao_train(nao_train_queue, nao, nao_optimizer)
