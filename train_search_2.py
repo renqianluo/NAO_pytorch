@@ -506,7 +506,7 @@ def main():
         if args.controller_expand is not None:
             src_buffers = []
             tgt_buffers = []
-            for _ in range(args.expand-1):
+            for _ in range(args.controller_expand-1):
                 for src, tgt in zip(encoder_input, encoder_target):
                     a = np.random.randint(0, 5)
                     b = np.random.randint(0, 5)
