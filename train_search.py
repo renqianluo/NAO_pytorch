@@ -526,8 +526,8 @@ def main():
                             src[20 + 4 * (b + 1):]
                     src_buffers.append(src)
                     tgt_buffers.append(tgt)
-            encoder_input = src_buffers
-            encoder_target = tgt_buffers
+            encoder_input = encoder_input + src_buffers
+            encoder_target = encoder_target + tgt_buffers
             n = len(encoder_input)
             indices = list(range(n))
             np.random.shuffle(indices)
