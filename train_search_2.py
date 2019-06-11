@@ -527,7 +527,8 @@ def main():
         else:
             train_indices = list(range(len(encoder_input)))
             valid_indices = list(range(len(encoder_input)))
-
+        logging.info('Train data: {}\tValid data: {}'.format(len(train_indices), len(valid_indices)))
+            
         nao_train_dataset = utils.NAODataset(encoder_input, encoder_target, True, swap=True if args.controller_expand is None else False)
         nao_valid_dataset = utils.NAODataset(encoder_input, encoder_target, False)
         nao_train_queue = torch.utils.data.DataLoader(
