@@ -532,7 +532,7 @@ def main():
             train_encoder_target = encoder_target
             valid_encoder_input = encoder_input
             valid_encoder_target = encoder_target
-        logging.info('Train data: {}\tValid data: {}'.format(len(train_encoder_input), len(train_encoder_target)))
+        logging.info('Train data: {}\tValid data: {}'.format(len(train_encoder_input), len(valid_encoder_input)))
 
         nao_train_dataset = utils.NAODataset(train_encoder_input, train_encoder_target, True, swap=True if args.controller_expand is None else False)
         nao_valid_dataset = utils.NAODataset(valid_encoder_input, valid_encoder_target, False)

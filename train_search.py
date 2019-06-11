@@ -541,7 +541,7 @@ def main():
             train_encoder_target = encoder_target
             valid_encoder_input = encoder_input
             valid_encoder_target = encoder_target
-        logging.info('Train data: {}\tValid data: {}'.format(len(train_encoder_input), len(train_encoder_target)))
+        logging.info('Train data: {}\tValid data: {}'.format(len(train_encoder_input), len(valid_encoder_input)))
 
         nao_train_dataset = utils.NAODataset(train_encoder_input, train_encoder_target, True, swap=True if args.controller_expand is None else False)
         nao_valid_dataset = utils.NAODataset(valid_encoder_input, valid_encoder_target, False)
@@ -593,7 +593,7 @@ def main():
         else:
             new_arch_pool = old_archs + new_archs + utils.generate_arch(args.controller_random_arch, 5, 5)
         logging.info("Totally %d architectures now to train", len(new_arch_pool))
-        
+
         child_arch_pool = new_arch_pool
         with open(os.path.join(args.output_dir, 'arch_pool'), 'w') as f:
             for arch in new_arch_pool:
