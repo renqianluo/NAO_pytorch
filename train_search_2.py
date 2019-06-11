@@ -14,7 +14,8 @@ import torch.nn.functional as F
 import torchvision.datasets as dset
 import torchvision.transforms as transforms
 import torch.backends.cudnn as cudnn
-from model_search import NASNetworkCIFAR, NASNetworkImageNet
+from model import NASNetworkCIFAR, NASNetworkImageNet
+from model_search import NASWSNetworkCIFAR, NASWSNetworkImageNet
 from controller import NAO
 
 parser = argparse.ArgumentParser(description='NAO Search')
@@ -28,7 +29,7 @@ parser.add_argument('--lazy_load', action='store_true', default=False)
 parser.add_argument('--output_dir', type=str, default='models')
 parser.add_argument('--seed', type=int, default=0)
 parser.add_argument('--child_sample_policy', type=str, default=None)
-parser.add_argument('--child_batch_size', type=int, default=160)
+parser.add_argument('--child_batch_size', type=int, default=64)
 parser.add_argument('--child_eval_batch_size', type=int, default=500)
 parser.add_argument('--child_epochs', type=int, default=30)
 parser.add_argument('--child_layers', type=int, default=2)
@@ -47,7 +48,8 @@ parser.add_argument('--child_lr', type=float, default=0.1)
 parser.add_argument('--child_label_smooth', type=float, default=0.1, help='label smoothing')
 parser.add_argument('--child_gamma', type=float, default=0.97, help='learning rate decay')
 parser.add_argument('--child_decay_period', type=int, default=1, help='epochs between two learning rate decays')
-parser.add_argument('--controller_seed_arch', type=int, default=1000)
+parser.add_argument('--controller_seed_arch', type=int, default=600)
+parser.add_argument('--controller_expand', type=int, default=None)
 parser.add_argument('--controller_new_arch', type=int, default=300)
 parser.add_argument('--controller_encoder_layers', type=int, default=1)
 parser.add_argument('--controller_encoder_hidden_size', type=int, default=96)
@@ -127,7 +129,7 @@ def build_cifar10(model_state_dict=None, optimizer_state_dict=None, **kwargs):
         sampler=torch.utils.data.sampler.SubsetRandomSampler(indices[split:num_train]),
         pin_memory=True, num_workers=16)
     
-    model = NASNetworkCIFAR(10, args.child_layers, args.child_nodes, args.child_channels, args.child_keep_prob, args.child_drop_path_keep_prob,
+    model = NASWSNetworkCIFAR(10, args.child_layers, args.child_nodes, args.child_channels, args.child_keep_prob, args.child_drop_path_keep_prob,
                        args.child_use_aux_head, args.steps)
     model = model.cuda()
     train_criterion = nn.CrossEntropyLoss().cuda()
@@ -170,7 +172,7 @@ def build_cifar100(model_state_dict=None, optimizer_state_dict=None, **kwargs):
         sampler=torch.utils.data.sampler.SubsetRandomSampler(indices[split:num_train]),
         pin_memory=True, num_workers=16)
     
-    model = NASNetworkCIFAR(100, args.child_layers, args.child_nodes, args.child_channels, args.child_keep_prob, args.child_drop_path_keep_prob,
+    model = NASWSNetworkCIFAR(100, args.child_layers, args.child_nodes, args.child_channels, args.child_keep_prob, args.child_drop_path_keep_prob,
                        args.child_use_aux_head, args.steps)
     model = model.cuda()
     train_criterion = nn.CrossEntropyLoss().cuda()
@@ -244,7 +246,7 @@ def build_imagenet(model_state_dict, optimizer_state_dict, **kwargs):
         sampler=torch.utils.data.sampler.SubsetRandomSampler(valid_indices),
         pin_memory=True, num_workers=16)
     
-    model = NASNetworkImageNet(1000, args.child_layers, args.child_nodes, args.child_channels, args.child_keep_prob,
+    model = NASWSNetworkImageNet(1000, args.child_layers, args.child_nodes, args.child_channels, args.child_keep_prob,
                        args.child_drop_path_keep_prob, args.child_use_aux_head, args.steps)
     model = model.cuda()
     train_criterion = CrossEntropyLabelSmooth(1000, args.child_label_smooth).cuda()
@@ -276,10 +278,7 @@ def child_train(train_queue, model, optimizer, global_step, arch_pool, arch_pool
 
         optimizer.zero_grad()
         # sample an arch to train
-        if arch_pool is None:
-            arch = utils.generate_arch(1, args.child_nodes, 5)[0]  # [[[conv],[reduc]]]
-        else:
-            arch = utils.sample_arch(arch_pool, arch_pool_prob)
+        arch = utils.sample_arch(arch_pool, arch_pool_prob)
         logits, aux_logits = model(input, arch, global_step)
         global_step += 1
         loss = criterion(logits, target)
@@ -407,6 +406,7 @@ def main():
 
     logging.info("args = %s", args)
     
+    child_arch_pool = None
     if args.child_arch_pool is not None:
         logging.info('Architecture pool is provided, loading')
         with open(args.child_arch_pool) as f:
@@ -419,6 +419,9 @@ def main():
             archs = f.read().splitlines()
             archs = list(map(utils.build_dag, archs))
             child_arch_pool = archs
+
+    build_fn = get_builder(args.dataset)
+    train_queue, valid_queue, model, train_criterion, eval_criterion, optimizer, scheduler = build_fn(ratio=0.9, epoch=-1)
 
     nao = NAO(
         args.controller_encoder_layers,
@@ -440,18 +443,36 @@ def main():
     nao = nao.cuda()
     logging.info("Encoder-Predictor-Decoder param size = %fMB", utils.count_parameters_in_MB(nao))
 
-    build_fn = get_builder(args.dataset)
+    
+    if child_arch_pool is None:
+        child_arch_pool = utils.generate_arch(args.controller_seed_arch, args.child_nodes, 5)  # [[[conv],[reduc]]]
     arch_pool = []
     arch_pool_valid_acc = []
+    args.relu_before_cl = False
     for i in range(4):
-        train_queue, valid_queue, model, train_criterion, eval_criterion, optimizer, scheduler = build_fn(ratio=0.9, epoch=-1)
         step = 0
+        if args.child_sample_policy == 'params':
+            child_arch_pool_prob = []
+            for arch in child_arch_pool:
+                if args.dataset == 'cifar10':
+                    tmp_model = NASNetworkCIFAR(args, 10, args.child_layers, args.child_nodes, args.child_channels, args.child_keep_prob, args.child_drop_path_keep_prob,
+                        args.child_use_aux_head, args.steps, arch)
+                elif args.dataset == 'cifar100':
+                    tmp_model = NASNetworkCIFAR(args, 100, args.child_layers, args.child_nodes, args.child_channels, args.child_keep_prob, args.child_drop_path_keep_prob,
+                        args.child_use_aux_head, args.steps, arch)
+                else:
+                    tmp_model = NASNetworkImageNet(args, 1000, args.child_layers, args.child_nodes, args.child_channels, args.child_keep_prob,
+                        args.child_drop_path_keep_prob, args.child_use_aux_head, args.steps, arch)
+                child_arch_pool_prob.append(utils.count_parameters_in_MB(tmp_model))
+                del tmp_model
+        else:
+            child_arch_pool_prob = None
         for epoch in range(1, args.child_epochs + 1):
             scheduler.step()
             lr = scheduler.get_lr()[0]
             logging.info('epoch %d lr %e', epoch, lr)
             # sample an arch to train
-            train_acc, train_obj, step = child_train(train_queue, model, optimizer, step, child_arch_pool, None, train_criterion)
+            train_acc, train_obj, step = child_train(train_queue, model, optimizer, step, child_arch_pool, child_arch_pool_prob, train_criterion)
             logging.info('train_acc %f', train_acc)
 
 
@@ -482,20 +503,49 @@ def main():
         max_val = max(arch_pool_valid_acc)
         encoder_target = [(i - min_val) / (max_val - min_val) for i in arch_pool_valid_acc]
 
-        nao_train_dataset = utils.NAODataset(encoder_input, encoder_target, True, swap=True)
+        if args.controller_expand is not None:
+            src_buffers = []
+            tgt_buffers = []
+            for _ in range(args.expand-1):
+                for src, tgt in zip(encoder_input, encoder_target):
+                    a = np.random.randint(0, 5)
+                    b = np.random.randint(0, 5)
+                    src = src[:4 * a] + src[4 * a + 2:4 * a + 4] + \
+                            src[4 * a:4 * a + 2] + src[4 * (a + 1):20 + 4 * b] + \
+                            src[20 + 4 * b + 2:20 + 4 * b + 4] + src[20 + 4 * b:20 + 4 * b + 2] + \
+                            src[20 + 4 * (b + 1):]
+                    src_buffers.append(src)
+                    tgt_buffers.append(tgt)
+            encoder_input = src_buffers
+            encoder_target = tgt_buffers
+            n = len(encoder_input)
+            indices = list(range(n))
+            np.random.shuffle(indices)
+            split = int(np.floor(0.1 * n))
+            train_indices = sorted(indices[:split])
+            valid_indices = sorted(indices[split:]) 
+        else:
+            train_indices = list(range(len(encoder_input)))
+            valid_indices = list(range(len(encoder_input)))
+
+        nao_train_dataset = utils.NAODataset(encoder_input, encoder_target, True, swap=True if args.controller_expand is None else False)
         nao_valid_dataset = utils.NAODataset(encoder_input, encoder_target, False)
         nao_train_queue = torch.utils.data.DataLoader(
-            nao_train_dataset, batch_size=args.controller_batch_size, shuffle=True, pin_memory=True)
+            nao_train_dataset, batch_size=args.controller_batch_size,
+            sampler=torch.utils.data.sampler.SubsetRandomSampler(train_indices),
+            shuffle=True, pin_memory=True)
         nao_valid_queue = torch.utils.data.DataLoader(
-            nao_valid_dataset, batch_size=len(nao_valid_dataset), shuffle=False, pin_memory=True)
+            nao_valid_dataset, batch_size=len(nao_valid_dataset),
+            sampler=torch.utils.data.sampler.SubsetRandomSampler(valid_indices),
+            shuffle=False, pin_memory=True)
         nao_optimizer = torch.optim.Adam(nao.parameters(), lr=args.controller_lr, weight_decay=args.controller_l2_reg)
         for nao_epoch in range(1, args.controller_epochs+1):
             nao_loss, nao_mse, nao_ce = nao_train(nao_train_queue, nao, nao_optimizer)
             logging.info("epoch %04d train loss %.6f mse %.6f ce %.6f", nao_epoch, nao_loss, nao_mse, nao_ce)
             if nao_epoch % 100 == 0:
                 pa, hs = nao_valid(nao_valid_queue, nao)
-                logging.info("Evaluation on training data")
-                logging.info('epoch %04d pairwise accuracy %.6f hamming distance %.6f', epoch, pa, hs)
+                logging.info("Evaluation on valid data")
+                logging.info('epoch %04d pairwise accuracy %.6f hamming distance %.6f', nao_epoch, pa, hs)
 
         # Generate new archs
         new_archs = []

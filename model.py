@@ -236,7 +236,10 @@ class NASNetworkCIFAR(nn.Module):
         self.use_aux_head = use_aux_head
         self.steps = steps
         self.relu_before_cl = args.relu_before_cl
-        arch = list(map(int, arch.strip().split()))
+        if isinstance(arch, str):
+            arch = list(map(int, arch.strip().split()))
+        elif isinstance(arch, list) and len(arch) == 2:
+            arch = arch[0] + arch[1]
         self.conv_arch = arch[:4 * self.nodes]
         self.reduc_arch = arch[4 * self.nodes:]
 

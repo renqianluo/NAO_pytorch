@@ -339,7 +339,7 @@ class InMemoryZipDataset(data.Dataset):
 
 
 class NAODataset(torch.utils.data.Dataset):
-    def __init__(self, inputs, targets=None, train=True, sos_id=0, eos_id=0, swap=True):
+    def __init__(self, inputs, targets=None, train=True, sos_id=0, eos_id=0, swap=False):
         super(NAODataset, self).__init__()
         if targets is not None:
             assert len(inputs) == len(targets)

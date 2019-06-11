@@ -149,9 +149,9 @@ class Cell(nn.Module):
         return out
     
 
-class NASNetworkCIFAR(nn.Module):
+class NASWSNetworkCIFAR(nn.Module):
     def __init__(self, classes, layers, nodes, channels, keep_prob, drop_path_keep_prob, use_aux_head, steps):
-        super(NASNetworkCIFAR, self).__init__()
+        super(NASWSNetworkCIFAR, self).__init__()
         self.classes = classes
         self.layers = layers
         self.nodes = nodes
@@ -202,7 +202,7 @@ class NASNetworkCIFAR(nn.Module):
                 nn.init.kaiming_normal_(w.data)
 
     def new(self):
-        model_new = NASNetworkCIFAR(
+        model_new = NASWSNetworkCIFAR(
             self.classes, self.layers, self.nodes, self.channels, self.keep_prob, self.drop_path_keep_prob,
             self.use_aux_head, self.steps)
         for x, y in zip(model_new.parameters(), self.parameters()):
@@ -229,9 +229,9 @@ class NASNetworkCIFAR(nn.Module):
         return logits, aux_logits
 
 
-class NASNetworkImageNet(nn.Module):
+class NASWSNetworkImageNet(nn.Module):
     def __init__(self, classes, layers, nodes, channels, keep_prob, drop_path_keep_prob, use_aux_head, steps):
-        super(NASNetworkImageNet, self).__init__()
+        super(NASWSNetworkImageNet, self).__init__()
         self.classes = classes
         self.layers = layers
         self.nodes = nodes
@@ -292,7 +292,7 @@ class NASNetworkImageNet(nn.Module):
                 nn.init.kaiming_normal(w.data)
     
     def new(self):
-        model_new = NASNetworkImageNet(
+        model_new = NASWSNetworkImageNet(
             self.classes, self.layers, self.nodes, self.channels, self.keep_prob, self.drop_path_keep_prob,
             self.use_aux_head, self.steps)
         for x, y in zip(model_new.parameters(), self.parameters()):
