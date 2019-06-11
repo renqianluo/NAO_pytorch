@@ -532,12 +532,10 @@ def main():
         nao_valid_dataset = utils.NAODataset(encoder_input, encoder_target, False)
         nao_train_queue = torch.utils.data.DataLoader(
             nao_train_dataset, batch_size=args.controller_batch_size,
-            sampler=torch.utils.data.sampler.SubsetRandomSampler(train_indices),
-            shuffle=True, pin_memory=True)
+            sampler=torch.utils.data.sampler.SubsetRandomSampler(train_indices), pin_memory=True)
         nao_valid_queue = torch.utils.data.DataLoader(
             nao_valid_dataset, batch_size=len(nao_valid_dataset),
-            sampler=torch.utils.data.sampler.SubsetRandomSampler(valid_indices),
-            shuffle=False, pin_memory=True)
+            sampler=torch.utils.data.sampler.SubsetRandomSampler(valid_indices), pin_memory=True)
         nao_optimizer = torch.optim.Adam(nao.parameters(), lr=args.controller_lr, weight_decay=args.controller_l2_reg)
         for nao_epoch in range(1, args.controller_epochs+1):
             nao_loss, nao_mse, nao_ce = nao_train(nao_train_queue, nao, nao_optimizer)
