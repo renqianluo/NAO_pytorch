@@ -406,19 +406,20 @@ def main():
 
     logging.info("args = %s", args)
     
-    child_arch_pool = None
     if args.child_arch_pool is not None:
         logging.info('Architecture pool is provided, loading')
         with open(args.child_arch_pool) as f:
             archs = f.read().splitlines()
             archs = list(map(utils.build_dag, archs))
             child_arch_pool = archs
-    if os.path.exists(os.path.join(args.output_dir, 'arch_pool')):
+    elif os.path.exists(os.path.join(args.output_dir, 'arch_pool')):
         logging.info('Architecture pool is founded, loading')
         with open(os.path.join(args.output_dir, 'arch_pool')) as f:
             archs = f.read().splitlines()
             archs = list(map(utils.build_dag, archs))
             child_arch_pool = archs
+    else:
+        child_arch_pool = None
 
     build_fn = get_builder(args.dataset)
     train_queue, valid_queue, model, train_criterion, eval_criterion, optimizer, scheduler = build_fn(ratio=0.9, epoch=-1)
