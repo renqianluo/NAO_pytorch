@@ -531,7 +531,7 @@ def main():
             n = len(encoder_input)
             indices = list(range(n))
             np.random.shuffle(indices)
-            split = int(np.floor(0.1 * n))
+            split = int(np.floor(0.9 * n))
             train_indices = sorted(indices[:split])
             valid_indices = sorted(indices[split:]) 
         else:
