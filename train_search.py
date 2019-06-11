@@ -446,6 +446,7 @@ def main():
     nao = nao.cuda()
     logging.info("param size = %fMB", utils.count_parameters_in_MB(nao))
 
+    args.relu_before_cl = False
     # Train child model
     if args.child_arch_pool is None:
         logging.info('Architecture pool is not provided, randomly generating now')
