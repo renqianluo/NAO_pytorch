@@ -29,7 +29,7 @@ parser.add_argument('--zip_file', action='store_true', default=False)
 parser.add_argument('--lazy_load', action='store_true', default=False) # best practice: do not use lazy_load. when using zip_file, do not use lazy_load
 parser.add_argument('--output_dir', type=str, default='models')
 parser.add_argument('--arch', type=str, default=None)
-parser.add_argument('--batch_size', type=int, default=32)
+parser.add_argument('--batch_size', type=int, default=128)
 parser.add_argument('--eval_batch_size', type=int, default=500)
 parser.add_argument('--epochs', type=int, default=250)
 parser.add_argument('--layers', type=int, default=4)
@@ -50,7 +50,7 @@ parser.add_argument('--seed', type=int, default=0)
 
 # distributed
 parser.add_argument('--distributed_init_method', type=str, default=None)
-parser.add_argument('--distributed_wolrd_size', type=int, default=max(1, torch.cuda.device_count()))
+parser.add_argument('--distributed_world_size', type=int, default=max(1, torch.cuda.device_count()))
 parser.add_argument('--distributed_rank', type=int, default=0)
 parser.add_argument('--distributed_backend', type=str, default='nccl')
 parser.add_argument('--distributed_port', default=-1, type=int)
@@ -187,6 +187,9 @@ def build_imagenet(args, model_state_dict, optimizer_state_dict, init_distribute
     logging.info('Found %d in validation data', len(valid_data))
 
     args.steps = int(np.ceil(len(train_data) / (args.batch_size))) * torch.cuda.device_count() * args.epochs
+    args.batch_size = args.batch_size * args.distributed_world_size
+    args.lr = args.batch_size * args.distributed_world_size
+
 
     train_queue = torch.utils.data.DataLoader(
         train_data, batch_size=args.batch_size, shuffle=True, pin_memory=True, num_workers=16)
@@ -205,9 +208,6 @@ def build_imagenet(args, model_state_dict, optimizer_state_dict, init_distribute
     if model_state_dict is not None:
         model.load_state_dict(model_state_dict)
 
-    if torch.cuda.device_count() > 1:
-        logging.info("Use %d %s", torch.cuda.device_count(), "GPUs !")
-        model = nn.DataParallel(model)
     model = model.cuda()
     
     train_criterion = CrossEntropyLabelSmooth(1000, args.label_smooth).cuda()
@@ -238,9 +238,14 @@ def main(args, init_distributed=False):
     torch.cuda.manual_seed(args.seed)
     
     logging.info("Args = %s", args)
+
+    if torch.cuda.is_available():
+        torch.cuda.set_device(args.device_id)
         
     _, model_state_dict, epoch, step, optimizer_state_dict, best_acc_top1 = utils.load(args.output_dir)
     train_queue, valid_queue, model, train_criterion, eval_criterion, optimizer, scheduler = build_imagenet(args, model_state_dict, optimizer_state_dict, init_distributed=init_distributed, epoch=epoch-1)
+
+    logging.info('Training on {} GPUs'.format(args.distributed_world_size))
 
     while epoch < args.epochs:
         scheduler.step()
