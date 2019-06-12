@@ -36,9 +36,9 @@ Pytorch >= 1.0.0
 #### To Train Discovered Architectures
 You can train the best architecture discovered (show in Fig. 1 in the Appendix of the paper) using:
 
-| Dataset | Script | GPU | Time | Checkpoint| Error Rate (Test)|
-| ------------- | ------------- | ------------- | ------------- | ------------- | ------------- |
-|Imagenet| train_imagenet_4cards.sh | 4 P40 | 6 days | TBD | 25.70% |
+| Dataset | Script | GPU | Time | Checkpoint| Top1 Error Rate | Top5 Error Rate |
+| ------------- | ------------- | ------------- | ------------- | ------------- | ------------- | ------------- |
+|Imagenet| train_imagenet_4cards.sh | 4 P40 | 6 days | TBD | 25.7% | 8.2% |
 
 by running:
 ```
