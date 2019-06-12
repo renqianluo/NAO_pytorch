@@ -46,6 +46,7 @@ parser.add_argument('--label_smooth', type=float, default=0.1, help='label smoot
 parser.add_argument('--gamma', type=float, default=0.97, help='learning rate decay')
 parser.add_argument('--decay_period', type=int, default=1, help='epochs between two learning rate decays')
 parser.add_argument('--l2_reg', type=float, default=3e-5)
+parser.add_argument('--relu_before_cl', action='store_true', default=False)
 parser.add_argument('--seed', type=int, default=0)
 
 # distributed
