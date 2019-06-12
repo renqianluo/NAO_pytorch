@@ -189,14 +189,14 @@ def build_imagenet(args, model_state_dict, optimizer_state_dict, init_distribute
     logging.info('Found %d in validation data', len(valid_data))
 
     args.steps = int(np.ceil(len(train_data) / (args.batch_size))) * torch.cuda.device_count() * args.epochs
-    args.batch_size = args.batch_size * args.distributed_world_size
-    args.lr = args.batch_size * args.distributed_world_size
+    #args.batch_size = args.batch_size * args.distributed_world_size
+    #args.lr = args.batch_size * args.distributed_world_size
 
 
     train_queue = torch.utils.data.DataLoader(
-        train_data, batch_size=args.batch_size, shuffle=True, pin_memory=True, num_workers=16)
+        train_data, batch_size=args.batch_size, shuffle=True, pin_memory=True, num_workers=0)
     valid_queue = torch.utils.data.DataLoader(
-        valid_data, batch_size=args.batch_size, shuffle=True, pin_memory=True, num_workers=16)
+        valid_data, batch_size=args.batch_size, shuffle=True, pin_memory=True, num_workers=0)
 
     if init_distributed:
         import socket
