@@ -313,6 +313,7 @@ class NASNetworkImageNet(nn.Module):
         self.drop_path_keep_prob = drop_path_keep_prob
         self.use_aux_head = use_aux_head
         self.steps = steps
+        self.relu_before_cl = args.relu_before_cl
         arch = list(map(int, arch.strip().split()))
         self.conv_arch = arch[:4 * self.nodes]
         self.reduc_arch = arch[4 * self.nodes:]
