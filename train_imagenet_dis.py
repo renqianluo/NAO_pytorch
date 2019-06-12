@@ -200,7 +200,7 @@ def build_imagenet(args, model_state_dict, optimizer_state_dict, init_distribute
     if init_distributed:
         import socket
         args.distributed_rank = distributed_utils.distributed_init(args)
-        print('| initialized host {} as rank {}'.format(socket.gethostbyname(), args.distributed_rank))
+        print('Initialized host {} as rank {}'.format(socket.gethostname(), args.distributed_rank))
 
     model = NASNetworkImageNet(args, 1000, args.layers, args.nodes, args.channels, args.keep_prob,
                        args.drop_path_keep_prob, args.use_aux_head, args.steps, args.arch)
@@ -295,7 +295,7 @@ def cli_main(args):
     if args.distributed_init_method is not None:
         if args.philly_vc is not None and not 'tcp' in args.distributed_init_method:
             distributed_utils.setup_init_philly_shared_system(args)
-        print('| running distributed main')
+        print('Running distributed main')
         distributed_main(args.device_id, args)
     
     elif args.distributed_world_size > 1:
@@ -303,8 +303,8 @@ def cli_main(args):
         args.distributed_init_method = 'tcp://localhost:{port}'.format(port=port)
         args.distributed_rank = None
         if max(args.update_freq) > 1 and args.ddp_backend != 'no_c10d':
-            print('| Note: you may get better performance with: --ddp-backend=no_c10d')
-        print('| running multiprocessing main')
+            print('Note: you may get better performance with: --ddp-backend=no_c10d')
+        print('Running multiprocessing main')
         torch.multiprocessing.spawn(
             fn=distributed_main,
             args=(args, main),
@@ -312,7 +312,7 @@ def cli_main(args):
         )
     
     else:
-        print('| running single GPU main')
+        print('Running single GPU main')
         main(args)
 
 if __name__ == '__main__':
