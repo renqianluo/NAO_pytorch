@@ -14,6 +14,15 @@ import torchvision.transforms as transforms
 
 B=5
 
+
+def item(tensor):
+    if hasattr(tensor, 'item'):
+        return tensor.item()
+    if hasattr(tensor, '__getitem__'):
+        return tensor[0]
+    return tensor
+
+
 class AvgrageMeter(object):
 
     def __init__(self):
