@@ -59,6 +59,7 @@ parser.add_argument('--distributed_no_spawn', action='store_true')
 parser.add_argument('--ddp_backend', default='c10d', type=str, choices=['c10d', 'no_c10d'])
 parser.add_argument('--bucket_cap_mb', default=25, type=int, metavar='MB')
 parser.add_argument('--fix_batches_to_gpus', action='store_true')
+parser.add_argument('--philly_vc', type=str, default=None)
 
 args = parser.parse_args()
 
