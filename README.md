@@ -5,7 +5,10 @@ Authors: [Renqian Luo](http://home.ustc.edu.cn/~lrq)\*, [Fei Tian](https://ustct
 
 ## Note
 This code is the Pytorch implementation of cnn part of NAO.
-This code tries to merge NAO and NAO-WS in 
+
+This code tries to merge NAO and NAO-WS together, so you can search in both complete way and weight-sharing way, and finally re-train and evaluate the architecture using the same network backbone model.py.
+
+In order to achieve this, there are few minor differences in some details in the code compared to the original version. 
 
 ## License
 The codes and models in this repo are released under the GNU GPLv3 license.
