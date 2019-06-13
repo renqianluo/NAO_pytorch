@@ -36,7 +36,7 @@ parser.add_argument('--lr_max', type=float, default=0.025)
 parser.add_argument('--lr_min', type=float, default=0)
 parser.add_argument('--keep_prob', type=float, default=0.6)
 parser.add_argument('--drop_path_keep_prob', type=float, default=0.8)
-parser.add_argument('--l2_reg', type=float, default=3e-4) #use 4e-5?
+parser.add_argument('--l2_reg', type=float, default=5e-4) #use 5e-4?
 parser.add_argument('--arch', type=str, default=None)
 parser.add_argument('--use_aux_head', action='store_true', default=False)
 parser.add_argument('--relu_before_cl', action='store_true', default=False)
