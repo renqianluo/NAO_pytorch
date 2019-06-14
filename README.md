@@ -38,7 +38,7 @@ You can train the best architecture discovered (show in Fig. 1 in the Appendix o
 
 | Dataset | Script | GPU | Time | Checkpoint| Top1 Error Rate | Top5 Error Rate |
 | ------------- | ------------- | ------------- | ------------- | ------------- | ------------- | ------------- |
-|Imagenet| train_imagenet_4cards.sh | 4 P40 | 6 days | TBD | 25.7% | 8.2% |
+|Imagenet| train_imagenet_4cards.sh | 4 P40 | 6 days | ['Google'](https://drive.google.com/file/d/1zrBJroadBXLv59nbcu78ET_H0IOxVJw-/view?usp=sharing) | 25.7% | 8.2% |
 
 by running:
 ```
