@@ -235,7 +235,6 @@ class NASNetworkCIFAR(nn.Module):
         self.drop_path_keep_prob = drop_path_keep_prob
         self.use_aux_head = use_aux_head
         self.steps = steps
-        self.relu_before_cl = args.relu_before_cl
         if isinstance(arch, str):
             arch = list(map(int, arch.strip().split()))
         elif isinstance(arch, list) and len(arch) == 2:
@@ -293,8 +292,6 @@ class NASNetworkCIFAR(nn.Module):
             if self.use_aux_head and i == self.aux_head_index and self.training:
                 aux_logits = self.auxiliary_head(s1)
         out = s1
-        if self.relu_before_cl:
-            out = self.relu(out)
         out = self.global_pooling(out)
         out = self.dropout(out)
         logits = self.classifier(out.view(out.size(0), -1))
@@ -313,7 +310,6 @@ class NASNetworkImageNet(nn.Module):
         self.drop_path_keep_prob = drop_path_keep_prob
         self.use_aux_head = use_aux_head
         self.steps = steps
-        self.relu_before_cl = args.relu_before_cl
         arch = list(map(int, arch.strip().split()))
         self.conv_arch = arch[:4 * self.nodes]
         self.reduc_arch = arch[4 * self.nodes:]
@@ -381,8 +377,6 @@ class NASNetworkImageNet(nn.Module):
                 aux_logits = self.auxiliary_head(s1)
         
         out = s1
-        if self.relu_before_cl:
-            out = self.relu(out)
         out = self.global_pooling(out)
         out = self.dropout(out)
         logits = self.classifier(out.view(out.size(0), -1))
