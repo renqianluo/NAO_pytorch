@@ -271,8 +271,6 @@ class NASNetworkCIFAR(nn.Module):
             if self.use_aux_head and i == self.aux_head_index:
                 self.auxiliary_head = AuxHeadCIFAR(outs[-1][-1], classes)
         
-        if self.relu_before_cl:
-            self.relu = nn.ReLU(inplace=False)
         self.global_pooling = nn.AdaptiveAvgPool2d(1)
         self.dropout = nn.Dropout(1 - self.keep_prob)
         self.classifier = nn.Linear(outs[-1][-1], classes)
@@ -354,8 +352,6 @@ class NASNetworkImageNet(nn.Module):
             if self.use_aux_head and i == self.aux_head_index:
                 self.auxiliary_head = AuxHeadImageNet(outs[-1][-1], classes)
         
-        if self.relu_before_cl:
-            self.relu = nn.ReLU(inplace=False)
         self.global_pooling = nn.AdaptiveAvgPool2d(1)
         self.dropout = nn.Dropout(1 - self.keep_prob)
         self.classifier = nn.Linear(outs[-1][-1], classes)

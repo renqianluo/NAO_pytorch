@@ -422,6 +422,7 @@ def main():
         child_arch_pool = None
 
     build_fn = get_builder(args.dataset)
+    train_queue, valid_queue, model, train_criterion, eval_criterion, optimizer, scheduler = build_fn(ratio=0.9, epoch=-1)
 
     nao = NAO(
         args.controller_encoder_layers,
@@ -449,7 +450,6 @@ def main():
         child_arch_pool = utils.generate_arch(args.controller_seed_arch, args.child_nodes, 5)  # [[[conv],[reduc]]]
     arch_pool = []
     arch_pool_valid_acc = []
-    args.relu_before_cl = False
     for i in range(4):
         if args.child_sample_policy == 'params':
             child_arch_pool_prob = []
@@ -468,7 +468,6 @@ def main():
         else:
             child_arch_pool_prob = None
 
-        train_queue, valid_queue, model, train_criterion, eval_criterion, optimizer, scheduler = build_fn(ratio=0.9, epoch=-1)
         step = 0
         for epoch in range(1, args.child_epochs + 1):
             scheduler.step()

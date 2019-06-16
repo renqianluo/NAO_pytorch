@@ -189,7 +189,6 @@ class NASWSNetworkCIFAR(nn.Module):
             if self.use_aux_head and i == self.aux_head_index:
                 self.auxiliary_head = AuxHeadCIFAR(outs[-1][-1], classes)
 
-        #self.relu = nn.ReLU(inplace=False)
         self.global_pooling = nn.AdaptiveAvgPool2d(1)
         self.dropout = nn.Dropout(1 - self.keep_prob)
         self.classifier = nn.Linear(outs[-1][-1], classes)
@@ -200,6 +199,8 @@ class NASWSNetworkCIFAR(nn.Module):
         for w in self.parameters():
             if w.data.dim() >= 2:
                 nn.init.kaiming_normal_(w.data, mode='fan_out')
+            else:
+                nn.init.zeros_(w)
 
     def new(self):
         model_new = NASWSNetworkCIFAR(
@@ -222,7 +223,6 @@ class NASWSNetworkCIFAR(nn.Module):
             if self.use_aux_head and i == self.aux_head_index and self.training:
                 aux_logits = self.auxiliary_head(s1, bn_train=bn_train)
         out = s1
-        #out = self.relu(s1)
         out = self.global_pooling(out)
         out = self.dropout(out)
         logits = self.classifier(out.view(out.size(0), -1))
@@ -279,7 +279,6 @@ class NASWSNetworkImageNet(nn.Module):
             if self.use_aux_head and i == self.aux_head_index:
                 self.auxiliary_head = AuxHeadImageNet(outs[-1][-1], classes)
         
-        #self.relu = nn.ReLU(inplace=False)
         self.global_pooling = nn.AdaptiveAvgPool2d(1)
         self.dropout = nn.Dropout(1 - self.keep_prob)
         self.classifier = nn.Linear(outs[-1][-1], classes)
@@ -290,6 +289,8 @@ class NASWSNetworkImageNet(nn.Module):
         for w in self.parameters():
             if w.data.dim() >= 2:
                 nn.init.kaiming_normal_(w.data, mode='fan_out')
+            else:
+                nn.init.zeros_(w)
     
     def new(self):
         model_new = NASWSNetworkImageNet(
@@ -313,7 +314,6 @@ class NASWSNetworkImageNet(nn.Module):
             if self.use_aux_head and i == self.aux_head_index and self.training:
                 aux_logits = self.auxiliary_head(s1, bn_train=bn_train)
         out = s1
-        #out = self.relu(s1)
         out = self.global_pooling(out)
         out = self.dropout(out)
         logits = self.classifier(out.view(out.size(0), -1))
