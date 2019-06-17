@@ -471,7 +471,7 @@ def main():
         model.init_parameters()
         optimizer = torch.optim.SGD(
             model.parameters(),
-            args.child_lr,
+            args.child_lr_max,
             momentum=0.9,
             weight_decay=args.child_l2_reg,
         )
