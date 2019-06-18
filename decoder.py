@@ -4,7 +4,6 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
-INITRANGE = 0.04
 SOS_ID = 0
 EOS_ID = 0
 
@@ -22,13 +21,6 @@ class Attention(nn.Module):
         self.input_proj = nn.Linear(input_dim, source_dim, bias=bias)
         self.output_proj = nn.Linear(input_dim + source_dim, output_dim, bias=bias)
         self.mask = None
-        
-        self.init_parameters()
-        
-    def init_parameters(self):
-        for w in self.parameters():
-            if w.data.dim() >= 2:
-                nn.init.uniform_(w.data, -INITRANGE, INITRANGE)
     
     def set_mask(self, mask):
         self.mask = mask
