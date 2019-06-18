@@ -198,7 +198,7 @@ class NASWSNetworkCIFAR(nn.Module):
     def init_parameters(self):
         for w in self.parameters():
             if w.data.dim() >= 2:
-                nn.init.kaiming_normal_(w.data, mode='fan_out')
+                nn.init.kaiming_normal_(w.data)
             else:
                 nn.init.zeros_(w)
 
@@ -288,7 +288,7 @@ class NASWSNetworkImageNet(nn.Module):
     def init_parameters(self):
         for w in self.parameters():
             if w.data.dim() >= 2:
-                nn.init.kaiming_normal_(w.data, mode='fan_out')
+                nn.init.kaiming_normal_(w.data)
             else:
                 nn.init.zeros_(w)
     
