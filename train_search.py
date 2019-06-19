@@ -553,10 +553,6 @@ def main():
         for nao_epoch in range(1, args.controller_epochs+1):
             nao_loss, nao_mse, nao_ce = nao_train(nao_train_queue, nao, nao_optimizer)
             logging.info("epoch %04d train loss %.6f mse %.6f ce %.6f", nao_epoch, nao_loss, nao_mse, nao_ce)
-            if nao_epoch % 100 == 0:
-                pa, hs = nao_valid(nao_valid_queue, nao)
-                logging.info("Evaluation on valid data")
-                logging.info('epoch %04d pairwise accuracy %.6f hamming distance %.6f', epoch, pa, hs)
 
         # Generate new archs
         new_archs = []
