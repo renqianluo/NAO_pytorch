@@ -32,6 +32,7 @@ class Encoder(nn.Module):
         self.mlp_hidden_size = mlp_hidden_size
         
         self.embedding = nn.Embedding(self.vocab_size, self.emb_size)
+        self.dropout = nn.Dropout(dropout)
         self.rnn = nn.LSTM(self.hidden_size, self.hidden_size, self.layers, batch_first=True, dropout=dropout)
         self.mlp = nn.Sequential()
         for i in range(self.mlp_layers):
@@ -49,6 +50,7 @@ class Encoder(nn.Module):
     
     def forward(self, x):
         embedded = self.embedding(x)
+        embedded = self.dropout(embedded)
         if self.source_length != self.length:
             assert self.source_length % self.length == 0
             ratio = self.source_length // self.length

@@ -51,6 +51,7 @@ parser.add_argument('--child_decay_period', type=int, default=1, help='epochs be
 parser.add_argument('--controller_seed_arch', type=int, default=600)
 parser.add_argument('--controller_expand', type=int, default=None)
 parser.add_argument('--controller_new_arch', type=int, default=300)
+parser.add_argument('--controller_discard', action='store_true', default=False)
 parser.add_argument('--controller_encoder_layers', type=int, default=1)
 parser.add_argument('--controller_encoder_hidden_size', type=int, default=96)
 parser.add_argument('--controller_encoder_emb_size', type=int, default=48)
@@ -485,8 +486,8 @@ def main():
         arch_pool_valid_acc += child_arch_pool_valid_acc
 
         arch_pool_valid_acc_sorted_indices = np.argsort(arch_pool_valid_acc)[::-1]
-        arch_pool = np.array(arch_pool)[arch_pool_valid_acc_sorted_indices].tolist()
-        arch_pool_valid_acc = np.array(arch_pool_valid_acc)[arch_pool_valid_acc_sorted_indices].tolist()
+        arch_pool = [arch_pool[i] for i in arch_pool_valid_acc_sorted_indices]
+        arch_pool_valid_acc = [arch_pool_valid_acc[i] for i in arch_pool_valid_acc]
         with open(os.path.join(args.output_dir, 'arch_pool.{}'.format(i)), 'w') as fa:
             with open(os.path.join(args.output_dir, 'arch_pool.perf.{}'.format(i)), 'w') as fp:
                 for arch, perf in zip(arch_pool, arch_pool_valid_acc):

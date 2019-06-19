@@ -73,6 +73,7 @@ class Decoder(nn.Module):
         self.eos_id = EOS_ID
         self.init_input = None
         self.embedding = nn.Embedding(self.vocab_size, self.hidden_size)
+        self.dropout = nn.Dropout(dropout)
         self.attention = Attention(self.hidden_size)
         self.out = nn.Linear(self.hidden_size, self.vocab_size)
     
@@ -80,6 +81,7 @@ class Decoder(nn.Module):
         batch_size = x.size(0)
         output_size = x.size(1)
         embedded = self.embedding(x)
+        embedded = self.dropout(embedded)
         output, hidden = self.rnn(embedded, hidden)
         output, attn = self.attention(output, encoder_outputs)
         

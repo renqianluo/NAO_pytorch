@@ -486,8 +486,8 @@ def main():
         arch_pool_valid_acc += child_arch_pool_valid_acc
 
         arch_pool_valid_acc_sorted_indices = np.argsort(arch_pool_valid_acc)[::-1]
-        arch_pool = np.array(arch_pool)[arch_pool_valid_acc_sorted_indices].tolist()
-        arch_pool_valid_acc = np.array(arch_pool_valid_acc)[arch_pool_valid_acc_sorted_indices].tolist()
+        arch_pool = [arch_pool[i] for i in arch_pool_valid_acc_sorted_indices]
+        arch_pool_valid_acc = [arch_pool_valid_acc[i] for i in arch_pool_valid_acc]
         with open(os.path.join(args.output_dir, 'arch_pool.{}'.format(i)), 'w') as fa:
             with open(os.path.join(args.output_dir, 'arch_pool.perf.{}'.format(i)), 'w') as fp:
                 for arch, perf in zip(arch_pool, arch_pool_valid_acc):

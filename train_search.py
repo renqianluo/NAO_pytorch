@@ -491,8 +491,8 @@ def main():
         old_archs_perf = valid_accuracy_list
 
         old_archs_sorted_indices = np.argsort(old_archs_perf)[::-1]
-        old_archs = np.array(old_archs)[old_archs_sorted_indices].tolist()
-        old_archs_perf = np.array(old_archs_perf)[old_archs_sorted_indices].tolist()
+        old_archs = [old_archs[i] for i in old_archs_sorted_indices]
+        old_archs_perf = [old_archs_perf[i] for i in old_archs_sorted_indices]
         with open(os.path.join(args.output_dir, 'arch_pool.{}'.format(epoch)), 'w') as fa:
             with open(os.path.join(args.output_dir, 'arch_pool.perf.{}'.format(epoch)), 'w') as fp:
                 with open(os.path.join(args.output_dir, 'arch_pool'), 'w') as fa_latest:
