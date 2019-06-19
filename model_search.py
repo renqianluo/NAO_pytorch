@@ -289,8 +289,6 @@ class NASWSNetworkImageNet(nn.Module):
         for w in self.parameters():
             if w.data.dim() >= 2:
                 nn.init.kaiming_normal_(w.data)
-            else:
-                nn.init.zeros_(w)
     
     def new(self):
         model_new = NASWSNetworkImageNet(
