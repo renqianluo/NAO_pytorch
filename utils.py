@@ -14,6 +14,15 @@ import torchvision.transforms as transforms
 
 B=5
 
+
+def item(tensor):
+    if hasattr(tensor, 'item'):
+        return tensor.item()
+    if hasattr(tensor, '__getitem__'):
+        return tensor[0]
+    return tensor
+
+
 class AvgrageMeter(object):
 
     def __init__(self):
@@ -339,7 +348,7 @@ class InMemoryZipDataset(data.Dataset):
 
 
 class NAODataset(torch.utils.data.Dataset):
-    def __init__(self, inputs, targets=None, train=True, sos_id=0, eos_id=0, swap=True):
+    def __init__(self, inputs, targets=None, train=True, sos_id=0, eos_id=0, swap=False):
         super(NAODataset, self).__init__()
         if targets is not None:
             assert len(inputs) == len(targets)
