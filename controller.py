@@ -10,7 +10,7 @@ from decoder import Decoder
 
 SOS_ID = 0
 EOS_ID = 0
-INITRANGE=0.04
+
 
 class NAO(nn.Module):
     def __init__(self,
@@ -52,13 +52,7 @@ class NAO(nn.Module):
             encoder_length
         )
 
-        self.init_parameters()
         self.flatten_parameters()
-
-    def init_parameters(self):
-        for w in self.parameters():
-            if w.data.dim() >= 2:
-                nn.init.uniform_(w.data, -INITRANGE, INITRANGE)
     
     def flatten_parameters(self):
         self.encoder.rnn.flatten_parameters()

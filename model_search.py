@@ -149,9 +149,9 @@ class Cell(nn.Module):
         return out
     
 
-class NASNetworkCIFAR(nn.Module):
+class NASWSNetworkCIFAR(nn.Module):
     def __init__(self, classes, layers, nodes, channels, keep_prob, drop_path_keep_prob, use_aux_head, steps):
-        super(NASNetworkCIFAR, self).__init__()
+        super(NASWSNetworkCIFAR, self).__init__()
         self.classes = classes
         self.layers = layers
         self.nodes = nodes
@@ -189,7 +189,6 @@ class NASNetworkCIFAR(nn.Module):
             if self.use_aux_head and i == self.aux_head_index:
                 self.auxiliary_head = AuxHeadCIFAR(outs[-1][-1], classes)
 
-        #self.relu = nn.ReLU(inplace=False)
         self.global_pooling = nn.AdaptiveAvgPool2d(1)
         self.dropout = nn.Dropout(1 - self.keep_prob)
         self.classifier = nn.Linear(outs[-1][-1], classes)
@@ -200,9 +199,11 @@ class NASNetworkCIFAR(nn.Module):
         for w in self.parameters():
             if w.data.dim() >= 2:
                 nn.init.kaiming_normal_(w.data)
+            else:
+                nn.init.zeros_(w)
 
     def new(self):
-        model_new = NASNetworkCIFAR(
+        model_new = NASWSNetworkCIFAR(
             self.classes, self.layers, self.nodes, self.channels, self.keep_prob, self.drop_path_keep_prob,
             self.use_aux_head, self.steps)
         for x, y in zip(model_new.parameters(), self.parameters()):
@@ -222,16 +223,15 @@ class NASNetworkCIFAR(nn.Module):
             if self.use_aux_head and i == self.aux_head_index and self.training:
                 aux_logits = self.auxiliary_head(s1, bn_train=bn_train)
         out = s1
-        #out = self.relu(s1)
         out = self.global_pooling(out)
         out = self.dropout(out)
         logits = self.classifier(out.view(out.size(0), -1))
         return logits, aux_logits
 
 
-class NASNetworkImageNet(nn.Module):
+class NASWSNetworkImageNet(nn.Module):
     def __init__(self, classes, layers, nodes, channels, keep_prob, drop_path_keep_prob, use_aux_head, steps):
-        super(NASNetworkImageNet, self).__init__()
+        super(NASWSNetworkImageNet, self).__init__()
         self.classes = classes
         self.layers = layers
         self.nodes = nodes
@@ -279,7 +279,6 @@ class NASNetworkImageNet(nn.Module):
             if self.use_aux_head and i == self.aux_head_index:
                 self.auxiliary_head = AuxHeadImageNet(outs[-1][-1], classes)
         
-        #self.relu = nn.ReLU(inplace=False)
         self.global_pooling = nn.AdaptiveAvgPool2d(1)
         self.dropout = nn.Dropout(1 - self.keep_prob)
         self.classifier = nn.Linear(outs[-1][-1], classes)
@@ -289,10 +288,12 @@ class NASNetworkImageNet(nn.Module):
     def init_parameters(self):
         for w in self.parameters():
             if w.data.dim() >= 2:
-                nn.init.kaiming_normal(w.data)
+                nn.init.kaiming_normal_(w.data)
+            else:
+                nn.init.zeros_(w)
     
     def new(self):
-        model_new = NASNetworkImageNet(
+        model_new = NASWSNetworkImageNet(
             self.classes, self.layers, self.nodes, self.channels, self.keep_prob, self.drop_path_keep_prob,
             self.use_aux_head, self.steps)
         for x, y in zip(model_new.parameters(), self.parameters()):
@@ -313,7 +314,6 @@ class NASNetworkImageNet(nn.Module):
             if self.use_aux_head and i == self.aux_head_index and self.training:
                 aux_logits = self.auxiliary_head(s1, bn_train=bn_train)
         out = s1
-        #out = self.relu(s1)
         out = self.global_pooling(out)
         out = self.dropout(out)
         logits = self.classifier(out.view(out.size(0), -1))
