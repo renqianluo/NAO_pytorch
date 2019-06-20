@@ -400,11 +400,14 @@ def main():
     if not torch.cuda.is_available():
         logging.info('no gpu device available')
         sys.exit(1)
+        
     np.random.seed(args.seed)
-    cudnn.benchmark = True
     torch.manual_seed(args.seed)
-    cudnn.enabled = True
     torch.cuda.manual_seed(args.seed)
+    torch.cuda.manual_seed_all(args.seed)
+    cudnn.enabled = True
+    cudnn.benchmark = True
+    cudnn.deterministic = True
     
     args.steps = int(np.ceil(45000 / args.child_batch_size)) * args.child_epochs
 
@@ -449,7 +452,6 @@ def main():
     nao = nao.cuda()
     logging.info("Encoder-Predictor-Decoder param size = %fMB", utils.count_parameters_in_MB(nao))
 
-    args.relu_before_cl = False
     # Train child model
     if child_arch_pool is None:
         logging.info('Architecture pool is not provided, randomly generating now')
@@ -553,6 +555,10 @@ def main():
         for nao_epoch in range(1, args.controller_epochs+1):
             nao_loss, nao_mse, nao_ce = nao_train(nao_train_queue, nao, nao_optimizer)
             logging.info("epoch %04d train loss %.6f mse %.6f ce %.6f", nao_epoch, nao_loss, nao_mse, nao_ce)
+            if nao_epoch % 100 == 0:
+                pa, hs = nao_valid(nao_valid_queue, nao)
+                logging.info("Evaluation on valid data")
+                logging.info('epoch %04d pairwise accuracy %.6f hamming distance %.6f', epoch, pa, hs)
 
         # Generate new archs
         new_archs = []

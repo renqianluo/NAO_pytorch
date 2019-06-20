@@ -199,10 +199,12 @@ def main():
         sys.exit(1)
     
     np.random.seed(args.seed)
-    cudnn.benchmark = True
     torch.manual_seed(args.seed)
-    cudnn.enabled = True
     torch.cuda.manual_seed(args.seed)
+    torch.cuda.manual_seed_all(args.seed)
+    cudnn.enabled = True
+    cudnn.benchmark = True
+    cudnn.deterministic = True
     
     args.steps = int(np.ceil(50000 / args.batch_size)) * args.epochs
     logging.info("Args = %s", args)
