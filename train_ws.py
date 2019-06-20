@@ -85,7 +85,7 @@ def get_builder(dataset):
 def build_cifar10(model_state_dict=None, optimizer_state_dict=None, **kwargs):
     epoch = kwargs.pop('epoch')
     ratio = kwargs.pop('ratio')
-    train_transform, valid_transform = utils._data_transforms_cifar10(args.child_cutout_size)
+    train_transform, valid_transform = utils._data_transforms_cifar10(args.cutout_size)
     train_data = dset.CIFAR10(root=args.data, train=True, download=True, transform=train_transform)
     valid_data = dset.CIFAR10(root=args.data, train=True, download=True, transform=valid_transform)
 
@@ -96,16 +96,16 @@ def build_cifar10(model_state_dict=None, optimizer_state_dict=None, **kwargs):
     np.random.shuffle(indices)
 
     train_queue = torch.utils.data.DataLoader(
-        train_data, batch_size=args.child_batch_size,
+        train_data, batch_size=args.batch_size,
         sampler=torch.utils.data.sampler.SubsetRandomSampler(indices[:split]),
         pin_memory=True, num_workers=16)
     valid_queue = torch.utils.data.DataLoader(
-        valid_data, batch_size=args.child_eval_batch_size,
+        valid_data, batch_size=args.eval_batch_size,
         sampler=torch.utils.data.sampler.SubsetRandomSampler(indices[split:num_train]),
         pin_memory=True, num_workers=16)
     
-    model = NASWSNetworkCIFAR(10, args.child_layers, args.child_nodes, args.child_channels, args.child_keep_prob, args.child_drop_path_keep_prob,
-                       args.child_use_aux_head, args.steps)
+    model = NASWSNetworkCIFAR(10, args.layers, args.nodes, args.channels, args.keep_prob, args.drop_path_keep_prob,
+                       args.use_aux_head, args.steps)
     model = model.cuda()
     train_criterion = nn.CrossEntropyLoss().cuda()
     eval_criterion = nn.CrossEntropyLoss().cuda()
@@ -113,15 +113,15 @@ def build_cifar10(model_state_dict=None, optimizer_state_dict=None, **kwargs):
 
     optimizer = torch.optim.SGD(
         model.parameters(),
-        args.child_lr_max,
+        args.lr_max,
         momentum=0.9,
-        weight_decay=args.child_l2_reg,
+        weight_decay=args.l2_reg,
     )
     if model_state_dict is not None:
         model.load_state_dict(model_state_dict)
     if optimizer_state_dict is not None:
         optimizer.load_state_dict(optimizer_state_dict)
-    scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, args.child_epochs, args.child_lr_min, epoch)
+    scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, args.epochs, args.lr_min, epoch)
     return train_queue, valid_queue, model, train_criterion, eval_criterion, optimizer, scheduler
 
 
@@ -139,16 +139,16 @@ def build_cifar100(model_state_dict=None, optimizer_state_dict=None, **kwargs):
     np.random.shuffle(indices)
 
     train_queue = torch.utils.data.DataLoader(
-        train_data, batch_size=args.child_batch_size,
+        train_data, batch_size=args.batch_size,
         sampler=torch.utils.data.sampler.SubsetRandomSampler(indices[:split]),
         pin_memory=True, num_workers=16)
     valid_queue = torch.utils.data.DataLoader(
-        valid_data, batch_size=args.child_eval_batch_size,
+        valid_data, batch_size=args.eval_batch_size,
         sampler=torch.utils.data.sampler.SubsetRandomSampler(indices[split:num_train]),
         pin_memory=True, num_workers=16)
     
-    model = NASWSNetworkCIFAR(100, args.child_layers, args.child_nodes, args.child_channels, args.child_keep_prob, args.child_drop_path_keep_prob,
-                       args.child_use_aux_head, args.steps)
+    model = NASWSNetworkCIFAR(100, args.layers, args.nodes, args.channels, args.keep_prob, args.drop_path_keep_prob,
+                       args.use_aux_head, args.steps)
     model = model.cuda()
     train_criterion = nn.CrossEntropyLoss().cuda()
     eval_criterion = nn.CrossEntropyLoss().cuda()
@@ -156,15 +156,15 @@ def build_cifar100(model_state_dict=None, optimizer_state_dict=None, **kwargs):
 
     optimizer = torch.optim.SGD(
         model.parameters(),
-        args.child_lr_max,
+        args.lr_max,
         momentum=0.9,
-        weight_decay=args.child_l2_reg,
+        weight_decay=args.l2_reg,
     )
     if model_state_dict is not None:
         model.load_state_dict(model_state_dict)
     if optimizer_state_dict is not None:
         optimizer.load_state_dict(optimizer_state_dict)
-    scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, args.child_epochs, args.child_lr_min, epoch)
+    scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, args.epochs, args.lr_min, epoch)
     return train_queue, valid_queue, model, train_criterion, eval_criterion, optimizer, scheduler
 
 
@@ -213,32 +213,32 @@ def build_imagenet(model_state_dict, optimizer_state_dict, **kwargs):
     valid_indices = sorted(indices[split:])
 
     train_queue = torch.utils.data.DataLoader(
-        train_data, batch_size=args.child_batch_size,
+        train_data, batch_size=args.batch_size,
         sampler=torch.utils.data.sampler.SubsetRandomSampler(train_indices),
         pin_memory=True, num_workers=16)
     valid_queue = torch.utils.data.DataLoader(
-        train_data, batch_size=args.child_eval_batch_size,
+        train_data, batch_size=args.eval_batch_size,
         sampler=torch.utils.data.sampler.SubsetRandomSampler(valid_indices),
         pin_memory=True, num_workers=16)
     
-    model = NASWSNetworkImageNet(1000, args.child_layers, args.child_nodes, args.child_channels, args.child_keep_prob,
-                       args.child_drop_path_keep_prob, args.child_use_aux_head, args.steps)
+    model = NASWSNetworkImageNet(1000, args.layers, args.nodes, args.channels, args.keep_prob,
+                       args.drop_path_keep_prob, args.use_aux_head, args.steps)
     model = model.cuda()
-    train_criterion = CrossEntropyLabelSmooth(1000, args.child_label_smooth).cuda()
+    train_criterion = CrossEntropyLabelSmooth(1000, args.label_smooth).cuda()
     eval_criterion = nn.CrossEntropyLoss().cuda()
     logging.info("param size = %fMB", utils.count_parameters_in_MB(model))
 
     optimizer = torch.optim.SGD(
         model.parameters(),
-        args.child_lr,
+        args.lr,
         momentum=0.9,
-        weight_decay=args.child_l2_reg,
+        weight_decay=args.l2_reg,
     )
     if model_state_dict is not None:
         model.load_state_dict(model_state_dict)
     if optimizer_state_dict is not None:
         optimizer.load_state_dict(optimizer_state_dict)
-    scheduler = torch.optim.lr_scheduler.StepLR(optimizer, args.child_decay_period, gamma=args.child_gamma)
+    scheduler = torch.optim.lr_scheduler.StepLR(optimizer, args.decay_period, gamma=args.gamma)
     return train_queue, valid_queue, model, train_criterion, eval_criterion, optimizer, scheduler
 
 
@@ -261,7 +261,7 @@ def train(train_queue, model, optimizer, global_step, arch_pool, arch_pool_prob,
             aux_loss = criterion(aux_logits, target)
             loss += 0.4 * aux_loss
         loss.backward()
-        nn.utils.clip_grad_norm_(model.parameters(), args.child_grad_bound)
+        nn.utils.clip_grad_norm_(model.parameters(), args.grad_bound)
         optimizer.step()
         
         prec1, prec5 = utils.accuracy(logits, target, topk=(1, 5))
