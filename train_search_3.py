@@ -397,10 +397,12 @@ def main():
         logging.info('no gpu device available')
         sys.exit(1)
     np.random.seed(args.seed)
-    cudnn.benchmark = True
     torch.manual_seed(args.seed)
-    cudnn.enabled = True
     torch.cuda.manual_seed(args.seed)
+    torch.cuda.manual_seed_all(args.seed)
+    cudnn.enabled = True
+    cudnn.benchmark = True
+    cudnn.deterministic = True
     
     args.steps = int(np.ceil(45000 / args.child_batch_size)) * args.child_epochs
 
