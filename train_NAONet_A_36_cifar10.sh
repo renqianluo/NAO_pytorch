@@ -1,5 +1,5 @@
 nvidia-smi
-MODEL=NAONet_A_cifar10
+MODEL=NAONet_A_36_cifar10
 OUTPUT_DIR=exp/$MODEL
 DATA_DIR=data
 
@@ -12,9 +12,9 @@ python train_imagenet.py \
   --output_dir=$OUTPUT_DIR \
   --batch_size=128 \
   --arch="$fixed_arc" \
-  --channels=128 \
+  --channels=36 \
   --use_aux_head \
   --cutout_size=16 \
-  --l2_reg=5e-4 \
+  --l2_reg=3e-4 \
   --keep_prob=0.6 \
-  --drop_path_keep_prob=0.7 | tee -a $OUTPUT_DIR/train.log
+  --drop_path_keep_prob=0.8 | tee -a $OUTPUT_DIR/train.log
