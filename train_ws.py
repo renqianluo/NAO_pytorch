@@ -362,7 +362,7 @@ def main():
 
     arch_pool_valid_acc_sorted_indices = np.argsort(arch_pool_valid_acc)[::-1]
     arch_pool = [arch_pool[i] for i in arch_pool_valid_acc_sorted_indices]
-    arch_pool_valid_acc = [arch_pool_valid_acc[i] for i in arch_pool_valid_acc]
+    arch_pool_valid_acc = [arch_pool_valid_acc[i] for i in arch_pool_valid_acc_sorted_indices]
 
     # Output archs and evaluated error rate
     with open(os.path.join(args.output_dir, 'arch_pool.{}'.format(args.iteration)), 'w') as fa:

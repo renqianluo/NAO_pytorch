@@ -396,6 +396,7 @@ def main():
     if not torch.cuda.is_available():
         logging.info('no gpu device available')
         sys.exit(1)
+        
     np.random.seed(args.seed)
     torch.manual_seed(args.seed)
     torch.cuda.manual_seed(args.seed)
@@ -489,7 +490,7 @@ def main():
 
         arch_pool_valid_acc_sorted_indices = np.argsort(arch_pool_valid_acc)[::-1]
         arch_pool = [arch_pool[i] for i in arch_pool_valid_acc_sorted_indices]
-        arch_pool_valid_acc = [arch_pool_valid_acc[i] for i in arch_pool_valid_acc]
+        arch_pool_valid_acc = [arch_pool_valid_acc[i] for i in arch_pool_valid_acc_sorted_indices]
         with open(os.path.join(args.output_dir, 'arch_pool.{}'.format(i)), 'w') as fa:
             with open(os.path.join(args.output_dir, 'arch_pool.perf.{}'.format(i)), 'w') as fp:
                 for arch, perf in zip(arch_pool, arch_pool_valid_acc):

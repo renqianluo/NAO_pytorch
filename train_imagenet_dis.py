@@ -60,7 +60,6 @@ parser.add_argument('--distributed_no_spawn', action='store_true')
 parser.add_argument('--ddp_backend', default='c10d', type=str, choices=['c10d', 'no_c10d'])
 parser.add_argument('--bucket_cap_mb', default=25, type=int, metavar='MB')
 parser.add_argument('--fix_batches_to_gpus', action='store_true')
-parser.add_argument('--philly_vc', type=str, default=None)
 
 args = parser.parse_args()
 
@@ -171,8 +170,8 @@ def build_imagenet(args, model_state_dict, optimizer_state_dict, init_distribute
             valid_data = utils.ZipDataset(validdir, valid_transform)
         else:
             logging.info('Loading data into memory')
-            train_data = utils.InMemoryZipDataset(traindir, train_transform, num_workers=32)
-            valid_data = utils.InMemoryZipDataset(validdir, valid_transform, num_workers=32)
+            train_data = utils.InMemoryZipDataset(traindir, train_transform, num_workers=8)
+            valid_data = utils.InMemoryZipDataset(validdir, valid_transform, num_workers=8)
     else:
         logging.info('Loading data from directory')
         traindir = os.path.join(args.data, 'train')
@@ -182,8 +181,8 @@ def build_imagenet(args, model_state_dict, optimizer_state_dict, init_distribute
             valid_data = dset.ImageFolder(validdir, valid_transform)
         else:
             logging.info('Loading data into memory')
-            train_data = utils.InMemoryDataset(traindir, train_transform, num_workers=32)
-            valid_data = utils.InMemoryDataset(validdir, valid_transform, num_workers=32)
+            train_data = utils.InMemoryDataset(traindir, train_transform, num_workers=8)
+            valid_data = utils.InMemoryDataset(validdir, valid_transform, num_workers=8)
     
     logging.info('Found %d in training data', len(train_data))
     logging.info('Found %d in validation data', len(valid_data))
@@ -234,10 +233,12 @@ def main(args, init_distributed=False):
         sys.exit(1)
     
     np.random.seed(args.seed)
-    cudnn.benchmark = True
     torch.manual_seed(args.seed)
-    cudnn.enabled = True
     torch.cuda.manual_seed(args.seed)
+    torch.cuda.manual_seed_all(args.seed)
+    cudnn.enabled = True
+    cudnn.benchmark = True
+    cudnn.deterministic = True
     
     logging.info("Args = %s", args)
 
@@ -294,8 +295,6 @@ def cli_main(args):
         distributed_utils.infer_init_method(args)
     
     if args.distributed_init_method is not None:
-        if args.philly_vc is not None and not 'tcp' in args.distributed_init_method:
-            distributed_utils.setup_init_philly_shared_system(args)
         print('Running distributed main')
         distributed_main(args.device_id, args)
     
