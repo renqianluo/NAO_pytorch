@@ -158,27 +158,18 @@ def main():
     logging.info("param size = %fMB", utils.count_parameters_in_MB(nao))
     nao = nao.cuda()
 
-    with open(os.path.join(args.data, 'train.src')) as f:
+    with open(os.path.join(args.data, 'arch_pool.{}'.format(args.iteration))) as f:
         arch_pool = f.read().splitlines()
         arch_pool = list(map(utils.build_dag, arch_pool))
-    with open(os.path.join(args.data, 'train.tgt')) as f:
+    with open(os.path.join(args.data, 'arch_pool.perf.{}'.format(args.iteration))) as f:
         arch_pool_valid_acc = f.read().splitlines()
         arch_pool_valid_acc = list(map(float, arch_pool_valid_acc))
 
-    with open(os.path.join(args.data, 'valid.src')) as f:
-        valid_arch_pool = f.read().splitlines()
-        valid_arch_pool = list(map(utils.build_dag, valid_arch_pool))
-    with open(os.path.join(args.data, 'valid.tgt')) as f:
-        valid_arch_pool_valid_acc = f.read().splitlines()
-        valid_arch_pool_valid_acc = list(map(float, valid_arch_pool_valid_acc))
-
     logging.info('Training Encoder-Predictor-Decoder')
     train_encoder_input = list(map(lambda x: utils.parse_arch_to_seq(x[0], 2) + utils.parse_arch_to_seq(x[1], 2), arch_pool))
-    valid_encoder_input = list(map(lambda x: utils.parse_arch_to_seq(x[0], 2) + utils.parse_arch_to_seq(x[1], 2), valid_arch_pool))
     min_val = min(arch_pool_valid_acc)
     max_val = max(arch_pool_valid_acc)
     train_encoder_target = [(i - min_val) / (max_val - min_val) for i in arch_pool_valid_acc]
-    valid_encoder_target = [(i - min_val) / (max_val - min_val) for i in valid_arch_pool_valid_acc]
 
     if args.expand is not None:
         buffer1, buffer2 = [], []
@@ -196,7 +187,7 @@ def main():
         train_encoder_target += buffer2
 
     nao_train_dataset = utils.NAODataset(train_encoder_input, train_encoder_target, True, swap=True)
-    nao_valid_dataset = utils.NAODataset(valid_encoder_input, valid_encoder_target, False)
+    nao_valid_dataset = utils.NAODataset(train_encoder_input, train_encoder_target, False)
     nao_train_queue = torch.utils.data.DataLoader(
         nao_train_dataset, batch_size=args.batch_size, shuffle=True, pin_memory=True)
     nao_valid_queue = torch.utils.data.DataLoader(
