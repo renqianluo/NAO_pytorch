@@ -365,12 +365,14 @@ def main():
     arch_pool_valid_acc = [arch_pool_valid_acc[i] for i in arch_pool_valid_acc]
 
     # Output archs and evaluated error rate
-    with open(os.path.join(args.output_dir, 'arch_pool.{}.perf'.format(args.iteration)), 'w') as f:
-        for arch, perf in zip(arch_pool, arch_pool_valid_acc):
-            arch = ' '.join(map(str, arch[0] + arch[1]))
-            f.write('arch: {}\tvalid acc: {}\n'.format(arch, perf))
+    with open(os.path.join(args.output_dir, 'arch_pool.{}'.format(args.iteration)), 'w') as fa:
+        with open(os.path.join(args.output_dir, 'arch_pool.{}.perf'.format(args.iteration)), 'w') as fb:
+            for arch, perf in zip(arch_pool, arch_pool_valid_acc):
+                arch = ' '.join(map(str, arch[0] + arch[1]))
+                fa.write('{}\n'.format(arch))
+                fb.write('{}\n'.format(perf))
     logging.info('Finish training!')
-      
+    
 
 if __name__ == '__main__':
     main()

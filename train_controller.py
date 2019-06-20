@@ -21,7 +21,6 @@ parser = argparse.ArgumentParser()
 parser.add_argument('--data', type=str, default='data')
 parser.add_argument('--output_dir', type=str, default='models')
 parser.add_argument('--seed', type=int, default=0)
-parser.add_argument('--nodes', type=int, default=7)
 parser.add_argument('--new_arch', type=int, default=300)
 parser.add_argument('--encoder_layers', type=int, default=1)
 parser.add_argument('--encoder_hidden_size', type=int, default=64)
@@ -47,6 +46,9 @@ parser.add_argument('--lr', type=float, default=0.001)
 parser.add_argument('--optimizer', type=str, default='adam')
 parser.add_argument('--grad_bound', type=float, default=5.0)
 parser.add_argument('--expand', type=int, default=None)
+parser.add_argument('--iteration', type=int, default=0)
+parser.add_argument('--generate_topk', type=int, default=100)
+parser.add_argument('--remain_topk', type=int, default=100)
 args = parser.parse_args()
 
 log_format = '%(asctime)s %(message)s'
@@ -214,8 +216,8 @@ def main():
 
     new_archs = []
     predict_step_size = 0
-    top100_archs = list(map(lambda x: utils.parse_arch_to_seq(x[0], 2) + utils.parse_arch_to_seq(x[1], 2), arch_pool[:100]))
-    nao_infer_dataset = utils.NAODataset(top100_archs, None, False)
+    top_archs = list(map(lambda x: utils.parse_arch_to_seq(x[0], 2) + utils.parse_arch_to_seq(x[1], 2), arch_pool[:args.generate_topk]))
+    nao_infer_dataset = utils.NAODataset(top_archs, None, False)
     nao_infer_queue = torch.utils.data.DataLoader(nao_infer_dataset, batch_size=len(nao_infer_dataset), shuffle=False, pin_memory=True)
         
     while len(new_archs) < args.new_arch:
@@ -232,6 +234,12 @@ def main():
             break
 
     logging.info("Generate %d new archs", len(new_archs))
+    new_arch_pool = new_archs + arch_pool[:args.remain_topk]
+    with open(os.path.join(args.output_dir, 'new_arch_pool.{}'.format(args.iteration)), 'w') as f:
+        for arch in zip(new_arch_pool):
+            arch = ' '.join(map(str, arch[0] + arch[1]))
+            f.write('{}\n'.format(arch))
+    logging.info('Finish training!')
 
 
 if __name__ == '__main__':
