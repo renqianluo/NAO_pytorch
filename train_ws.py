@@ -46,7 +46,7 @@ parser.add_argument('--label_smooth', type=float, default=0.1, help='label smoot
 parser.add_argument('--gamma', type=float, default=0.97, help='learning rate decay')
 parser.add_argument('--decay_period', type=int, default=1, help='epochs between two learning rate decays')
 parser.add_argument('--sample_policy', type=str, default=None)
-parser.add_argument('--epoch_offset', type=int, default=0)
+parser.add_argument('--iteration', type=int, default=0)
 parser.add_argument('--seed_arch', type=int, default=1000)
 args = parser.parse_args()
 
@@ -360,7 +360,7 @@ def main():
     arch_pool_valid_acc = valid(valid_queue, model, arch_pool, eval_criterion)
 
     # Output archs and evaluated error rate
-    with open(os.path.join(args.output_dir, 'arch_pool.{}.perf'.format(args.epoch_offset + epoch)), 'w') as f:
+    with open(os.path.join(args.output_dir, 'arch_pool.{}.perf'.format(args.iteration)), 'w') as f:
         for arch, perf in zip(arch_pool, arch_pool_valid_acc):
             arch = ' '.join(map(str, arch[0] + arch[1]))
             f.write('arch: {}\tvalid acc: {}\n'.format(arch, perf))
