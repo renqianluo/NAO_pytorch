@@ -402,7 +402,7 @@ def main():
     torch.cuda.manual_seed(args.seed)
     torch.cuda.manual_seed_all(args.seed)
     cudnn.enabled = True
-    cudnn.benchmark = True
+    cudnn.benchmark = False
     cudnn.deterministic = True
     
     args.steps = int(np.ceil(45000 / args.child_batch_size)) * args.child_epochs
