@@ -165,7 +165,7 @@ def main():
     with open(os.path.join(args.output_dir, 'arch_pool.{}'.format(args.iteration))) as f:
         arch_pool = f.read().splitlines()
         arch_pool = list(map(utils.build_dag, arch_pool))
-    with open(os.path.join(args.output_dir, 'arch_pool.perf.{}'.format(args.iteration))) as f:
+    with open(os.path.join(args.output_dir, 'arch_pool.{}.perf'.format(args.iteration))) as f:
         arch_pool_valid_acc = f.read().splitlines()
         arch_pool_valid_acc = list(map(float, arch_pool_valid_acc))
 
