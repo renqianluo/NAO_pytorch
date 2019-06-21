@@ -232,7 +232,7 @@ def main():
     new_arch_pool = list(map(lambda x: utils.parse_seq_to_arch(x, 2), new_archs))
     new_arch_pool = new_arch_pool + arch_pool[:args.remain_topk]
     with open(os.path.join(args.output_dir, 'new_arch_pool.{}'.format(args.iteration)), 'w') as f:
-        for arch in zip(new_arch_pool):
+        for arch in new_arch_pool:
             arch = ' '.join(map(str, arch[0] + arch[1]))
             f.write('{}\n'.format(arch))
     logging.info('Finish training!')
