@@ -3,6 +3,7 @@ import sys
 import glob
 import time
 import copy
+import random
 import numpy as np
 import torch
 import utils
@@ -198,6 +199,7 @@ def main():
         logging.info('No GPU found!')
         sys.exit(1)
     
+    random.seed(args.seed)
     np.random.seed(args.seed)
     torch.manual_seed(args.seed)
     torch.cuda.manual_seed(args.seed)

@@ -5,6 +5,7 @@ import time
 import copy
 import logging
 import argparse
+import random
 import numpy as np
 import torch
 import torch.nn as nn
@@ -130,6 +131,7 @@ def main():
         logging.info('No GPU found!')
         sys.exit(1)
     
+    random.seed(args.seed)
     np.random.seed(args.seed)
     torch.manual_seed(args.seed)
     torch.cuda.manual_seed(args.seed)
@@ -160,10 +162,10 @@ def main():
     logging.info("param size = %fMB", utils.count_parameters_in_MB(nao))
     nao = nao.cuda()
 
-    with open(os.path.join(args.data, 'arch_pool.{}'.format(args.iteration))) as f:
+    with open(os.path.join(args.output_dir, 'arch_pool.{}'.format(args.iteration))) as f:
         arch_pool = f.read().splitlines()
         arch_pool = list(map(utils.build_dag, arch_pool))
-    with open(os.path.join(args.data, 'arch_pool.perf.{}'.format(args.iteration))) as f:
+    with open(os.path.join(args.output_dir, 'arch_pool.perf.{}'.format(args.iteration))) as f:
         arch_pool_valid_acc = f.read().splitlines()
         arch_pool_valid_acc = list(map(float, arch_pool_valid_acc))
 
