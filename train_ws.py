@@ -325,6 +325,7 @@ def main():
         with open(args.arch_pool) as f:
             archs = f.read().splitlines()
             arch_pool = list(map(utils.build_dag, archs))
+        logging.info('{} architectures have been loaded for training.'.format(len(arch_pool)))
     
     if arch_pool is None:
         logging.info('Architecture pool is not provided, randomly generating now')
