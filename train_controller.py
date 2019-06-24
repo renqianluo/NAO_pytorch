@@ -220,7 +220,7 @@ def main():
         logging.info('Generate new architectures with step size %d', predict_step_size)
         new_arch = nao_infer(nao_infer_queue, nao, predict_step_size, direction='+')
         for arch in new_arch:
-            if arch not in arch_pool and arch not in new_archs:
+            if arch not in train_encoder_input and arch not in new_archs:
                 new_archs.append(arch)
             if len(new_archs) >= args.new_arch:
                 break
