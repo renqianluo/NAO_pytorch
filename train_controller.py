@@ -204,10 +204,10 @@ def main():
         if nao_epoch % 100 == 0 or nao_epoch == 1:
             mse, pa, hs = nao_valid(nao_train_queue, nao)
             logging.info("Evaluation on train data")
-            logging.info('epoch %04d mse %.6f pairwise accuracy %.6f hamming distance %.6f', mse, nao_epoch, pa, hs)
+            logging.info('epoch %04d mse %.6f pairwise accuracy %.6f hamming distance %.6f', nao_epoch, mse, pa, hs)
             mse, pa, hs = nao_valid(nao_valid_queue, nao)
             logging.info("Evaluation on valid data")
-            logging.info('epoch %04d mse %.6f pairwise accuracy %.6f hamming distance %.6f', mse, nao_epoch, pa, hs)
+            logging.info('epoch %04d mse %.6f pairwise accuracy %.6f hamming distance %.6f', nao_epoch, mse, pa, hs)
 
     new_archs = []
     predict_step_size = 0

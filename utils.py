@@ -1,4 +1,5 @@
 import os
+import copy
 import numpy as np
 import logging
 import shutil
@@ -352,8 +353,8 @@ class NAODataset(torch.utils.data.Dataset):
         super(NAODataset, self).__init__()
         if targets is not None:
             assert len(inputs) == len(targets)
-        self.inputs = inputs
-        self.targets = targets
+        self.inputs = copy.deepcopy(inputs)
+        self.targets = copy.deepcopy(targets)
         self.train = train
         self.sos_id = sos_id
         self.eos_id = eos_id
