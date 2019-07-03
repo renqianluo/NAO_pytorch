@@ -406,6 +406,8 @@ def save_checkpoint(state, is_best, save):
       
 
 def save(model_path, args, model, epoch, step, optimizer, best_acc_top1, is_best=True):
+    if hasattr(model, 'module'):
+        model = model.module
     state_dict = {
         'args': args,
         'model': model.state_dict() if model else {},
