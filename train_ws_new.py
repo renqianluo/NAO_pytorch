@@ -36,6 +36,7 @@ parser.add_argument('--nodes', type=int, default=5)
 parser.add_argument('--channels', type=int, default=20)
 parser.add_argument('--cutout_size', type=int, default=None)
 parser.add_argument('--grad_bound', type=float, default=5.0)
+parser.add_argument('--lr_epochs', type=int, default=None)
 parser.add_argument('--lr_max', type=float, default=0.025)
 parser.add_argument('--lr_min', type=float, default=0.001)
 parser.add_argument('--keep_prob', type=float, default=1.0)
@@ -123,7 +124,7 @@ def build_cifar10(model_state_dict=None, optimizer_state_dict=None, **kwargs):
         model.load_state_dict(model_state_dict)
     if optimizer_state_dict is not None:
         optimizer.load_state_dict(optimizer_state_dict)
-    scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, args.epochs, args.lr_min, epoch)
+    scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, args.lr_epochs, args.lr_min, epoch)
     return train_queue, valid_queue, model, train_criterion, eval_criterion, optimizer, scheduler
 
 
@@ -166,7 +167,7 @@ def build_cifar100(model_state_dict=None, optimizer_state_dict=None, **kwargs):
         model.load_state_dict(model_state_dict)
     if optimizer_state_dict is not None:
         optimizer.load_state_dict(optimizer_state_dict)
-    scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, args.epochs, args.lr_min, epoch)
+    scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, args.lr_epochs, args.lr_min, epoch)
     return train_queue, valid_queue, model, train_criterion, eval_criterion, optimizer, scheduler
 
 
@@ -314,6 +315,9 @@ def main():
     cudnn.enabled = True
     cudnn.benchmark = False
     cudnn.deterministic = True
+
+    if args.lr_epochs is None:
+        args.lr_epochs = args.epochs
 
     args.steps = int(np.ceil(45000 / args.batch_size)) * args.epochs
 
