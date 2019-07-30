@@ -51,6 +51,7 @@ parser.add_argument('--decay_period', type=int, default=1, help='epochs between 
 parser.add_argument('--sample_policy', type=str, default=None)
 parser.add_argument('--iteration', type=int, default=0)
 parser.add_argument('--seed_arch', type=int, default=1000)
+parser.add_argument('--sort', action='store_true', default=False)
 args = parser.parse_args()
 
 utils.create_exp_dir(args.output_dir, scripts_to_save=glob.glob('*.py'))
@@ -371,9 +372,10 @@ def main():
     
     arch_pool_valid_acc = valid(valid_queue, model, arch_pool, eval_criterion)
 
-    arch_pool_valid_acc_sorted_indices = np.argsort(arch_pool_valid_acc)[::-1]
-    arch_pool = [arch_pool[i] for i in arch_pool_valid_acc_sorted_indices]
-    arch_pool_valid_acc = [arch_pool_valid_acc[i] for i in arch_pool_valid_acc_sorted_indices]
+    if args.sort:
+        arch_pool_valid_acc_sorted_indices = np.argsort(arch_pool_valid_acc)[::-1]
+        arch_pool = [arch_pool[i] for i in arch_pool_valid_acc_sorted_indices]
+        arch_pool_valid_acc = [arch_pool_valid_acc[i] for i in arch_pool_valid_acc_sorted_indices]
 
     # Output archs and evaluated error rate
     with open(os.path.join(args.output_dir, 'arch_pool.{}'.format(args.iteration)), 'w') as fa:
