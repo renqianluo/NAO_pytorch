@@ -282,6 +282,7 @@ def train(train_queue, model, optimizer, global_step, arch_pool, arch_pool_prob,
 
 def valid(valid_queue, model, arch_pool, criterion):
     valid_acc_list = []
+    top1 = utils.AvgrageMeter()
     with torch.no_grad():
         model.eval()
         for i, arch in enumerate(arch_pool):
@@ -294,10 +295,13 @@ def valid(valid_queue, model, arch_pool, criterion):
                 loss = criterion(logits, targets)
                     
                 prec1, prec5 = utils.accuracy(logits, targets, topk=(1, 5))
-                valid_acc_list.append(prec1.data/100)
-                
+                n = inputs.size(0)
+                top1.update(prec1.data/100, n)
+            
                 if (i+1) % 100 == 0:
                     logging.info('Valid arch %s\n loss %.2f top1 %f top5 %f', ' '.join(map(str, arch[0] + arch[1])), loss, prec1, prec5)
+            valid_acc_list.append(top1.avg)
+            top1.reset()
         
     return valid_acc_list
 
