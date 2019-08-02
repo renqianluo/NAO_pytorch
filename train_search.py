@@ -363,8 +363,10 @@ def nao_train(train_queue, model, optimizer):
 
 
 def nao_valid(queue, model):
-    pa = utils.AvgrageMeter()
-    hs = utils.AvgrageMeter()
+    inputs = []
+    targets = []
+    predictions = []
+    archs = []
     with torch.no_grad():
         model.eval()
         for step, sample in enumerate(queue):
@@ -378,11 +380,13 @@ def nao_valid(queue, model):
             
             predict_value, logits, arch = model(encoder_input)
             n = encoder_input.size(0)
-            pairwise_acc = utils.pairwise_accuracy(encoder_target.data.squeeze().tolist(), predict_value.data.squeeze().tolist())
-            hamming_dis = utils.hamming_distance(decoder_target.data.squeeze().tolist(), arch.data.squeeze().tolist())
-            pa.update(pairwise_acc, n)
-            hs.update(hamming_dis, n)
-    return pa.avg, hs.avg
+            inputs += encoder_input.data.squeeze().tolist()
+            targets += encoder_target.data.squeeze().tolist()
+            predictions += predict_value.data.squeeze().tolist()
+            archs += arch.data.squeeze().tolist()
+    pa = utils.pairwise_accuracy(targets, predictions)
+    hd = utils.hamming_distance(inputs, archs)
+    return pa, hd
 
 
 def nao_infer(queue, model, step, direction='+'):

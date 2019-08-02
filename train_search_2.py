@@ -360,8 +360,10 @@ def nao_train(train_queue, model, optimizer):
 
 
 def nao_valid(queue, model):
-    pa = utils.AvgrageMeter()
-    hs = utils.AvgrageMeter()
+    inputs = []
+    targets = []
+    predictions = []
+    archs = []
     with torch.no_grad():
         model.eval()
         for step, sample in enumerate(queue):
@@ -375,11 +377,13 @@ def nao_valid(queue, model):
             
             predict_value, logits, arch = model(encoder_input)
             n = encoder_input.size(0)
-            pairwise_acc = utils.pairwise_accuracy(encoder_target.data.squeeze().tolist(), predict_value.data.squeeze().tolist())
-            hamming_dis = utils.hamming_distance(decoder_target.data.squeeze().tolist(), arch.data.squeeze().tolist())
-            pa.update(pairwise_acc, n)
-            hs.update(hamming_dis, n)
-    return pa.avg, hs.avg
+            inputs += encoder_input.data.squeeze().tolist()
+            targets += encoder_target.data.squeeze().tolist()
+            predictions += predict_value.data.squeeze().tolist()
+            archs += arch.data.squeeze().tolist()
+    pa = utils.pairwise_accuracy(targets, predictions)
+    hd = utils.hamming_distance(inputs, archs)
+    return pa, hd
 
 
 def nao_infer(queue, model, step, direction='+'):
@@ -483,12 +487,13 @@ def main():
             train_acc, train_obj, step = child_train(train_queue, model, optimizer, step, child_arch_pool, child_arch_pool_prob, train_criterion)
             logging.info('train_acc %f', train_acc)
 
-
         # Evaluate seed archs
-        child_arch_pool_valid_acc = child_valid(valid_queue, model, child_arch_pool, eval_criterion)
+        #child_arch_pool_valid_acc = child_valid(valid_queue, model, child_arch_pool, eval_criterion)
 
+        #arch_pool += child_arch_pool
+        #arch_pool_valid_acc += child_arch_pool_valid_acc
         arch_pool += child_arch_pool
-        arch_pool_valid_acc += child_arch_pool_valid_acc
+        arch_pool_valid_acc = child_valid(valid_queue, model, arch_pool, eval_criterion)
 
         arch_pool_valid_acc_sorted_indices = np.argsort(arch_pool_valid_acc)[::-1]
         arch_pool = [arch_pool[i] for i in arch_pool_valid_acc_sorted_indices]
@@ -502,7 +507,6 @@ def main():
         if i == 3:
             break
                             
-
         # Train Encoder-Predictor-Decoder
         logging.info('Training Encoder-Predictor-Decoder for {} time'.format(i))
         encoder_input = list(map(lambda x: utils.parse_arch_to_seq(x[0], 2) + utils.parse_arch_to_seq(x[1], 2), arch_pool))
