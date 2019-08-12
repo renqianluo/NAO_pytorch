@@ -459,6 +459,7 @@ def main():
         child_arch_pool = utils.generate_arch(args.controller_seed_arch, args.child_nodes, 5)  # [[[conv],[reduc]]]
     arch_pool = []
     arch_pool_valid_acc = []
+    new_child_arch_pool = []
     for i in range(4):
         if args.child_sample_policy == 'params':
             child_arch_pool_prob = []
@@ -479,6 +480,7 @@ def main():
 
         _, _, model, train_criterion, eval_criterion, optimizer, scheduler = build_fn(ratio=0.9, epoch=-1)
         step = 0
+        logging.info("%d archs for training at iteration %d", len(child_arch_pool), i)
         for epoch in range(1, args.child_epochs + 1):
             scheduler.step()
             lr = scheduler.get_lr()[0]
@@ -491,8 +493,8 @@ def main():
         # Evaluate seed archs
         child_arch_pool_valid_acc = child_valid(valid_queue, model, child_arch_pool, eval_criterion)
 
-        arch_pool += child_arch_pool
-        arch_pool_valid_acc += child_arch_pool_valid_acc
+        arch_pool += child_arch_pool[:len(new_child_arch_pool)]
+        arch_pool_valid_acc += child_arch_pool_valid_acc[:len(new_child_arch_pool)]
 
         arch_pool_valid_acc_sorted_indices = np.argsort(arch_pool_valid_acc)[::-1]
         arch_pool = [arch_pool[i] for i in arch_pool_valid_acc_sorted_indices]
@@ -579,8 +581,9 @@ def main():
             if predict_step_size > max_step_size:
                 break
 
-        child_arch_pool = list(map(lambda x: utils.parse_seq_to_arch(x, 2), new_archs))  # [[[conv],[reduc]]]
-        logging.info("Generate %d new archs", len(child_arch_pool))
+        new_child_arch_pool = list(map(lambda x: utils.parse_seq_to_arch(x, 2), new_archs))  # [[[conv],[reduc]]]
+        logging.info("Generate %d new archs", len(new_child_arch_pool))
+        child_arch_pool = new_child_arch_pool + arch_pool[:args.controller_seed_arch - len(new_child_arch_pool)]
   
 
 if __name__ == '__main__':
