@@ -118,7 +118,7 @@ def build_cifar10(model_state_dict, optimizer_state_dict, **kwargs):
     epoch = kwargs.pop('epoch')
 
     train_transform, valid_transform = utils._data_transforms_cifar10(args.cutout_size)
-    if not args.split_train_for_valid:
+    if args.split_train_for_valid is None:
         train_data = dset.CIFAR10(root=args.data, train=True, download=True, transform=train_transform)
         valid_data = dset.CIFAR10(root=args.data, train=False, download=True, transform=valid_transform)
     
@@ -131,7 +131,7 @@ def build_cifar10(model_state_dict, optimizer_state_dict, **kwargs):
         valid_data = dset.CIFAR10(root=args.data, train=False, download=True, transform=valid_transform)
         n = len(train_data)
         indices = list(range(n))    
-        split = int(np.floor(0.9 * n))
+        split = int(np.floor(args.split_train_for_valid * n))
         np.random.shuffle(indices)
         train_queue = torch.utils.data.DataLoader(
             train_data, batch_size=args.child_batch_size,
