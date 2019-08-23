@@ -128,9 +128,9 @@ def build_cifar10(model_state_dict, optimizer_state_dict, **kwargs):
             valid_data, batch_size=args.eval_batch_size, shuffle=False, pin_memory=True, num_workers=16)
     else:
         train_data = dset.CIFAR10(root=args.data, train=True, download=True, transform=train_transform)
-        valid_data = dset.CIFAR10(root=args.data, train=False, download=True, transform=valid_transform)
+        valid_data = dset.CIFAR10(root=args.data, train=True, download=True, transform=valid_transform)
         n = len(train_data)
-        indices = list(range(n))    
+        indices = list(range(n))
         split = int(np.floor(args.split_train_for_valid * n))
         np.random.shuffle(indices)
         train_queue = torch.utils.data.DataLoader(
