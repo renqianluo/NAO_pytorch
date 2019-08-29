@@ -29,22 +29,21 @@ parser.add_argument('--zip_file', action='store_true', default=False)
 parser.add_argument('--lazy_load', action='store_true', default=False)
 parser.add_argument('--output_dir', type=str, default='models')
 parser.add_argument('--seed', type=int, default=0)
-parser.add_argument('--child_sample_policy', type=str, default=None)
 parser.add_argument('--child_batch_size', type=int, default=64)
 parser.add_argument('--child_eval_batch_size', type=int, default=500)
-parser.add_argument('--child_epochs', type=int, default=100)
-parser.add_argument('--child_layers', type=int, default=2)
+parser.add_argument('--child_epochs', type=int, default=150)
+parser.add_argument('--child_layers', type=int, default=3)
 parser.add_argument('--child_nodes', type=int, default=5)
 parser.add_argument('--child_channels', type=int, default=20)
 parser.add_argument('--child_cutout_size', type=int, default=None)
 parser.add_argument('--child_grad_bound', type=float, default=5.0)
 parser.add_argument('--child_lr_max', type=float, default=0.025)
 parser.add_argument('--child_lr_min', type=float, default=0.001)
-parser.add_argument('--child_keep_prob', type=float, default=0.8)
-parser.add_argument('--child_drop_path_keep_prob', type=float, default=1.0)
+parser.add_argument('--child_keep_prob', type=float, default=1.0)
+parser.add_argument('--child_drop_path_keep_prob', type=float, default=0.9)
 parser.add_argument('--child_l2_reg', type=float, default=3e-4)
 parser.add_argument('--child_use_aux_head', action='store_true', default=False)
-parser.add_argument('--child_eval_epochs', type=str, default='20')
+parser.add_argument('--child_eval_epochs', type=str, default='30')
 parser.add_argument('--child_arch_pool', type=str, default=None)
 parser.add_argument('--child_lr', type=float, default=0.1)
 parser.add_argument('--child_label_smooth', type=float, default=0.1, help='label smoothing')
@@ -52,10 +51,7 @@ parser.add_argument('--child_gamma', type=float, default=0.97, help='learning ra
 parser.add_argument('--child_decay_period', type=int, default=1, help='epochs between two learning rate decays')
 parser.add_argument('--controller_seed_arch', type=int, default=600)
 parser.add_argument('--controller_expand', type=int, default=None)
-parser.add_argument('--controller_discard', action='store_true', default=False)
 parser.add_argument('--controller_new_arch', type=int, default=300)
-parser.add_argument('--controller_random_arch', type=int, default=100)
-parser.add_argument('--controller_replace', action='store_true', default=False)
 parser.add_argument('--controller_encoder_layers', type=int, default=1)
 parser.add_argument('--controller_encoder_hidden_size', type=int, default=96)
 parser.add_argument('--controller_encoder_emb_size', type=int, default=48)
@@ -329,6 +325,214 @@ def child_valid(valid_queue, model, arch_pool, criterion):
     return valid_acc_list
 
 
+def train_and_evaluate_top_on_cifar10(archs, train_queue, valid_queue):
+    res = []
+    train_criterion = nn.CrossEntropyLoss().cuda()
+    eval_criterion = nn.CrossEntropyLoss().cuda()
+    for arch in archs:
+        objs = utils.AvgrageMeter()
+        top1 = utils.AvgrageMeter()
+        top5 = utils.AvgrageMeter()
+        model = NASNetworkCIFAR(args, 10, args.child_layers, args.child_nodes, args.child_channels, args.child_keep_prob, args.child_drop_path_keep_prob,
+                        args.child_use_aux_head, args.steps, arch)
+        model = model.cuda()
+        model.train()
+        optimizer = torch.optim.SGD(
+            model.parameters(),
+            args.child_lr_max,
+            momentum=0.9,
+            weight_decay=args.child_l2_reg,
+        )
+        scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, 10, args.child_lr_min)
+        global_step = 0
+        for e in range(10):
+            scheduler.step()
+            for step, (input, target) in enumerate(train_queue):
+                input = input.cuda().requires_grad_()
+                target = target.cuda()
+
+                optimizer.zero_grad()
+                # sample an arch to train
+                logits, aux_logits = model(input, global_step)
+                global_step += 1
+                loss = train_criterion(logits, target)
+                if aux_logits is not None:
+                    aux_loss = train_criterion(aux_logits, target)
+                    loss += 0.4 * aux_loss
+                loss.backward()
+                nn.utils.clip_grad_norm_(model.parameters(), args.child_grad_bound)
+                optimizer.step()
+            
+                prec1, prec5 = utils.accuracy(logits, target, topk=(1, 5))
+                n = input.size(0)
+                objs.update(loss.data, n)
+                top1.update(prec1.data, n)
+                top5.update(prec5.data, n)
+            
+                if (step+1) % 100 == 0:
+                    logging.info('Train %03d loss %e top1 %f top5 %f', step+1, objs.avg, top1.avg, top5.avg)
+        objs.reset()
+        top1.reset()
+        top5.reset()
+        with torch.no_grad():
+            model.eval()
+            for step, (input, target) in enumerate(valid_queue):
+                input = input.cuda()
+                target = target.cuda()
+            
+                logits, _ = model(input)
+                loss = eval_criterion(logits, target)
+            
+                prec1, prec5 = utils.accuracy(logits, target, topk=(1, 5))
+                n = input.size(0)
+                objs.update(loss.data, n)
+                top1.update(prec1.data, n)
+                top5.update(prec5.data, n)
+            
+                if (step+1) % 100 == 0:
+                    logging.info('valid %03d %e %f %f', step+1, objs.avg, top1.avg, top5.avg)
+        res.append(top1.avg)
+    return res
+
+
+def train_and_evaluate_top_on_cifar100(archs, train_queue, valid_queue):
+    res = []
+    train_criterion = nn.CrossEntropyLoss().cuda()
+    eval_criterion = nn.CrossEntropyLoss().cuda()
+    for arch in archs:
+        objs = utils.AvgrageMeter()
+        top1 = utils.AvgrageMeter()
+        top5 = utils.AvgrageMeter()
+        model = NASNetworkCIFAR(args, 100, args.child_layers, args.child_nodes, args.child_channels, args.child_keep_prob, args.child_drop_path_keep_prob,
+                        args.child_use_aux_head, args.steps, arch)
+        model = model.cuda()
+        model.train()
+        optimizer = torch.optim.SGD(
+            model.parameters(),
+            args.child_lr_max,
+            momentum=0.9,
+            weight_decay=args.child_l2_reg,
+        )
+        scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, 10, args.child_lr_min)
+        global_step = 0
+        for e in range(10):
+            scheduler.step()
+            for step, (input, target) in enumerate(train_queue):
+                input = input.cuda().requires_grad_()
+                target = target.cuda()
+
+                optimizer.zero_grad()
+                # sample an arch to train
+                logits, aux_logits = model(input, global_step)
+                global_step += 1
+                loss = train_criterion(logits, target)
+                if aux_logits is not None:
+                    aux_loss = train_criterion(aux_logits, target)
+                    loss += 0.4 * aux_loss
+                loss.backward()
+                nn.utils.clip_grad_norm_(model.parameters(), args.child_grad_bound)
+                optimizer.step()
+            
+                prec1, prec5 = utils.accuracy(logits, target, topk=(1, 5))
+                n = input.size(0)
+                objs.update(loss.data, n)
+                top1.update(prec1.data, n)
+                top5.update(prec5.data, n)
+            
+                if (step+1) % 100 == 0:
+                    logging.info('Train %03d loss %e top1 %f top5 %f', step+1, objs.avg, top1.avg, top5.avg)
+        objs.reset()
+        top1.reset()
+        top5.reset()
+        with torch.no_grad():
+            model.eval()
+            for step, (input, target) in enumerate(valid_queue):
+                input = input.cuda()
+                target = target.cuda()
+            
+                logits, _ = model(input)
+                loss = eval_criterion(logits, target)
+            
+                prec1, prec5 = utils.accuracy(logits, target, topk=(1, 5))
+                n = input.size(0)
+                objs.update(loss.data, n)
+                top1.update(prec1.data, n)
+                top5.update(prec5.data, n)
+            
+                if (step+1) % 100 == 0:
+                    logging.info('valid %03d %e %f %f', step+1, objs.avg, top1.avg, top5.avg)
+        res.append(top1.avg)
+    return res
+
+
+def train_and_evaluate_top_on_imagenet(archs, train_queue, valid_queue):
+    res = []
+    train_criterion = nn.CrossEntropyLoss().cuda()
+    eval_criterion = nn.CrossEntropyLoss().cuda()
+    for arch in archs:
+        objs = utils.AvgrageMeter()
+        top1 = utils.AvgrageMeter()
+        top5 = utils.AvgrageMeter()
+        model = NASNetworkImageNet(args, 1000, args.child_layers, args.child_nodes, args.child_channels, args.child_keep_prob, args.child_drop_path_keep_prob,
+                        args.child_use_aux_head, args.steps, arch)
+        model = model.cuda()
+        model.train()
+        optimizer = torch.optim.SGD(
+            model.parameters(),
+            args.child_lr,
+            momentum=0.9,
+            weight_decay=args.child_l2_reg,
+        )
+        for step, (input, target) in enumerate(train_queue):
+            input = input.cuda().requires_grad_()
+            target = target.cuda()
+
+            optimizer.zero_grad()
+            # sample an arch to train
+            logits, aux_logits = model(input, step)
+            loss = train_criterion(logits, target)
+            if aux_logits is not None:
+                aux_loss = train_criterion(aux_logits, target)
+                loss += 0.4 * aux_loss
+            loss.backward()
+            nn.utils.clip_grad_norm_(model.parameters(), args.child_grad_bound)
+            optimizer.step()
+            
+            prec1, prec5 = utils.accuracy(logits, target, topk=(1, 5))
+            n = input.size(0)
+            objs.update(loss.data, n)
+            top1.update(prec1.data, n)
+            top5.update(prec5.data, n)
+            
+            if (step+1) % 100 == 0:
+                logging.info('Train %03d loss %e top1 %f top5 %f', step+1, objs.avg, top1.avg, top5.avg)
+            if step == 500:
+                break
+
+        objs.reset()
+        top1.reset()
+        top5.reset()
+        with torch.no_grad():
+            model.eval()
+            for step, (input, target) in enumerate(valid_queue):
+                input = input.cuda()
+                target = target.cuda()
+            
+                logits, _ = model(input)
+                loss = eval_criterion(logits, target)
+            
+                prec1, prec5 = utils.accuracy(logits, target, topk=(1, 5))
+                n = input.size(0)
+                objs.update(loss.data, n)
+                top1.update(prec1.data, n)
+                top5.update(prec5.data, n)
+            
+                if (step+1) % 100 == 0:
+                    logging.info('valid %03d %e %f %f', step+1, objs.avg, top1.avg, top5.avg)
+        res.append(top1.avg)
+    return res
+        
+        
 def nao_train(train_queue, model, optimizer):
     objs = utils.AvgrageMeter()
     mse = utils.AvgrageMeter()
@@ -462,22 +666,7 @@ def main():
     if child_arch_pool is None:
         logging.info('Architecture pool is not provided, randomly generating now')
         child_arch_pool = utils.generate_arch(args.controller_seed_arch, args.child_nodes, 5)  # [[[conv],[reduc]]]
-    if args.child_sample_policy == 'params':
-        child_arch_pool_prob = []
-        for arch in child_arch_pool:
-            if args.dataset == 'cifar10':
-                tmp_model = NASNetworkCIFAR(args, 10, args.child_layers, args.child_nodes, args.child_channels, args.child_keep_prob, args.child_drop_path_keep_prob,
-                       args.child_use_aux_head, args.steps, arch)
-            elif args.dataset == 'cifar100':
-                tmp_model = NASNetworkCIFAR(args, 100, args.child_layers, args.child_nodes, args.child_channels, args.child_keep_prob, args.child_drop_path_keep_prob,
-                       args.child_use_aux_head, args.steps, arch)
-            else:
-                tmp_model = NASNetworkImageNet(args, 1000, args.child_layers, args.child_nodes, args.child_channels, args.child_keep_prob,
-                       args.child_drop_path_keep_prob, args.child_use_aux_head, args.steps, arch)
-            child_arch_pool_prob.append(utils.count_parameters_in_MB(tmp_model))
-            del tmp_model
-    else:
-        child_arch_pool_prob = None
+    child_arch_pool_prob = None
 
     eval_points = utils.generate_eval_points(child_eval_epochs, 0, args.child_epochs)
     step = 0
@@ -513,6 +702,24 @@ def main():
                             fp_latest.write('{}\n'.format(perf))
                             
         if epoch == args.child_epochs:
+            logging.info('Finish Searching')
+            logging.info('Reranking top 5 architectures')
+            # reranking top 5
+            top_archs = old_archs[:5]
+            if args.dataset == 'cifar10':
+                top_archs_perf = train_and_evaluate_top_on_cifar10(top_archs, train_queue, valid_queue)
+            elif args.dataset == 'cifar100':
+                top_archs_perf = train_and_evaluate_top_on_cifar100(top_archs, train_queue, valid_queue)
+            else:
+                top_archs_perf = train_and_evaluate_top_on_imagenet(top_archs, train_queue, valid_queue)
+            top_archs_sorted_indices = np.argsort(top_archs_perf)[::-1]
+            top_archs = [top_archs[i] for i in top_archs_sorted_indices]
+            top_archs_perf = [top_archs_perf[i] for i in top_archs_sorted_indices]
+            with open(os.path.join(args.output_dir, 'arch_pool.final'), 'w') as fa:
+                with open(os.path.join(args.output_dir, 'arch_pool.perf.final'), 'w') as fp:
+                    for arch, perf in zip(top_archs, top_archs_perf):
+                        fa.write('{}\n'.format(arch))
+                        fp.write('{}\n'.format(perf))
             break
 
         # Train Encoder-Predictor-Decoder
@@ -591,15 +798,7 @@ def main():
         num_new_archs = len(new_archs)
         logging.info("Generate %d new archs", num_new_archs)
         # replace bottom archs
-        if args.controller_replace:
-            new_arch_pool = old_archs[:len(old_archs) - (num_new_archs + args.controller_random_arch)] + \
-                            new_archs + utils.generate_arch(args.controller_random_arch, 5, 5)
-        # discard all archs except top k
-        elif args.controller_discard:
-            new_arch_pool = old_archs[:100] + new_archs + utils.generate_arch(args.controller_random_arch, 5, 5)
-        # use all
-        else:
-            new_arch_pool = old_archs + new_archs + utils.generate_arch(args.controller_random_arch, 5, 5)
+        new_arch_pool = old_archs[:len(old_archs) - num_new_archs] + new_archs
         logging.info("Totally %d architectures now to train", len(new_arch_pool))
 
         child_arch_pool = new_arch_pool
@@ -608,22 +807,8 @@ def main():
                 arch = ' '.join(map(str, arch[0] + arch[1]))
                 f.write('{}\n'.format(arch))
 
-        if args.child_sample_policy == 'params':
-            child_arch_pool_prob = []
-            for arch in child_arch_pool:
-                if args.dataset == 'cifar10':
-                    tmp_model = NASNetworkCIFAR(args, 10, args.child_layers, args.child_nodes, args.child_channels, args.child_keep_prob, args.child_drop_path_keep_prob,
-                        args.child_use_aux_head, args.steps, arch)
-                elif args.dataset == 'cifar100':
-                    tmp_model = NASNetworkCIFAR(args, 100, args.child_layers, args.child_nodes, args.child_channels, args.child_keep_prob, args.child_drop_path_keep_prob,
-                        args.child_use_aux_head, args.steps, arch)
-                else:
-                    tmp_model = NASNetworkImageNet(args, 1000, args.child_layers, args.child_nodes, args.child_channels, args.child_keep_prob,
-                        args.child_drop_path_keep_prob, args.child_use_aux_head, args.steps, arch)
-                child_arch_pool_prob.append(utils.count_parameters_in_MB(tmp_model))
-                del tmp_model
-        else:
-            child_arch_pool_prob = None
+        
+        child_arch_pool_prob = None
   
 
 if __name__ == '__main__':
