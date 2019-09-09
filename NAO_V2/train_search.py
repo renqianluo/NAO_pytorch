@@ -19,11 +19,11 @@ from model import NASNetworkCIFAR, NASNetworkImageNet
 from model_search import NASWSNetworkCIFAR, NASWSNetworkImageNet
 from controller import NAO
 
-parser = argparse.ArgumentParser(description='NAO CIFAR-10')
+parser = argparse.ArgumentParser(description='NAO Search')
 
 # Basic model parameters.
 parser.add_argument('--mode', type=str, default='train', choices=['train', 'test'])
-parser.add_argument('--data', type=str, default='./data')
+parser.add_argument('--data', type=str, default='data')
 parser.add_argument('--dataset', type=str, default='cifar10', choices=['cifar10, cifar100, imagenet'])
 parser.add_argument('--zip_file', action='store_true', default=False)
 parser.add_argument('--lazy_load', action='store_true', default=False)
@@ -31,7 +31,7 @@ parser.add_argument('--output_dir', type=str, default='models')
 parser.add_argument('--seed', type=int, default=0)
 parser.add_argument('--child_batch_size', type=int, default=64)
 parser.add_argument('--child_eval_batch_size', type=int, default=500)
-parser.add_argument('--child_epochs', type=int, default=150)
+parser.add_argument('--child_epochs', type=int, default=50)
 parser.add_argument('--child_layers', type=int, default=3)
 parser.add_argument('--child_nodes', type=int, default=5)
 parser.add_argument('--child_channels', type=int, default=20)
@@ -43,29 +43,28 @@ parser.add_argument('--child_keep_prob', type=float, default=1.0)
 parser.add_argument('--child_drop_path_keep_prob', type=float, default=0.9)
 parser.add_argument('--child_l2_reg', type=float, default=3e-4)
 parser.add_argument('--child_use_aux_head', action='store_true', default=False)
-parser.add_argument('--child_eval_epochs', type=str, default='30')
 parser.add_argument('--child_arch_pool', type=str, default=None)
 parser.add_argument('--child_lr', type=float, default=0.1)
 parser.add_argument('--child_label_smooth', type=float, default=0.1, help='label smoothing')
 parser.add_argument('--child_gamma', type=float, default=0.97, help='learning rate decay')
 parser.add_argument('--child_decay_period', type=int, default=1, help='epochs between two learning rate decays')
-parser.add_argument('--controller_seed_arch', type=int, default=600)
-parser.add_argument('--controller_expand', type=int, default=None)
+parser.add_argument('--controller_seed_arch', type=int, default=1000)
+parser.add_argument('--controller_expand', type=int, default=10)
 parser.add_argument('--controller_new_arch', type=int, default=300)
 parser.add_argument('--controller_encoder_layers', type=int, default=1)
-parser.add_argument('--controller_encoder_hidden_size', type=int, default=96)
-parser.add_argument('--controller_encoder_emb_size', type=int, default=48)
-parser.add_argument('--controller_mlp_layers', type=int, default=3)
+parser.add_argument('--controller_encoder_hidden_size', type=int, default=64)
+parser.add_argument('--controller_encoder_emb_size', type=int, default=32)
+parser.add_argument('--controller_mlp_layers', type=int, default=0)
 parser.add_argument('--controller_mlp_hidden_size', type=int, default=200)
 parser.add_argument('--controller_decoder_layers', type=int, default=1)
-parser.add_argument('--controller_decoder_hidden_size', type=int, default=96)
+parser.add_argument('--controller_decoder_hidden_size', type=int, default=64)
 parser.add_argument('--controller_source_length', type=int, default=40)
 parser.add_argument('--controller_encoder_length', type=int, default=20)
 parser.add_argument('--controller_decoder_length', type=int, default=40)
 parser.add_argument('--controller_encoder_dropout', type=float, default=0)
 parser.add_argument('--controller_mlp_dropout', type=float, default=0.1)
 parser.add_argument('--controller_decoder_dropout', type=float, default=0)
-parser.add_argument('--controller_l2_reg', type=float, default=1e-4)
+parser.add_argument('--controller_l2_reg', type=float, default=0)
 parser.add_argument('--controller_encoder_vocab_size', type=int, default=12)
 parser.add_argument('--controller_decoder_vocab_size', type=int, default=12)
 parser.add_argument('--controller_trade_off', type=float, default=0.8)
@@ -114,10 +113,10 @@ def build_cifar10(model_state_dict=None, optimizer_state_dict=None, **kwargs):
     train_transform, valid_transform = utils._data_transforms_cifar10(args.child_cutout_size)
     train_data = dset.CIFAR10(root=args.data, train=True, download=True, transform=train_transform)
     valid_data = dset.CIFAR10(root=args.data, train=True, download=True, transform=valid_transform)
-    
+
     num_train = len(train_data)
     assert num_train == len(valid_data)
-    indices = list(range(num_train)) 
+    indices = list(range(num_train))    
     split = int(np.floor(ratio * num_train))
     np.random.shuffle(indices)
 
@@ -194,7 +193,7 @@ def build_cifar100(model_state_dict=None, optimizer_state_dict=None, **kwargs):
     return train_queue, valid_queue, model, train_criterion, eval_criterion, optimizer, scheduler
 
 
-def build_imagenet(model_state_dict=None, optimizer_state_dict=None, **kwargs):
+def build_imagenet(model_state_dict, optimizer_state_dict, **kwargs):
     ratio = kwargs.pop('ratio')
     normalize = transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
     train_transform = transforms.Compose([
@@ -308,7 +307,7 @@ def child_valid(valid_queue, model, arch_pool, criterion):
     with torch.no_grad():
         model.eval()
         for i, arch in enumerate(arch_pool):
-            #for step, (inputs, targets) in enumerate(valid_queue):
+            # for step, (input, target) in enumerate(valid_queue):
             inputs, targets = next(iter(valid_queue))
             inputs = inputs.cuda()
             targets = targets.cuda()
@@ -531,8 +530,8 @@ def train_and_evaluate_top_on_imagenet(archs, train_queue, valid_queue):
                     logging.info('valid %03d %e %f %f', step+1, objs.avg, top1.avg, top5.avg)
         res.append(top1.avg)
     return res
-        
-        
+
+
 def nao_train(train_queue, model, optimizer):
     objs = utils.AvgrageMeter()
     mse = utils.AvgrageMeter()
@@ -622,7 +621,7 @@ def main():
     args.steps = int(np.ceil(45000 / args.child_batch_size)) * args.child_epochs
 
     logging.info("args = %s", args)
-
+    
     if args.child_arch_pool is not None:
         logging.info('Architecture pool is provided, loading')
         with open(args.child_arch_pool) as f:
@@ -638,7 +637,6 @@ def main():
     else:
         child_arch_pool = None
 
-    child_eval_epochs = eval(args.child_eval_epochs)
     build_fn = get_builder(args.dataset)
     train_queue, valid_queue, model, train_criterion, eval_criterion, optimizer, scheduler = build_fn(ratio=0.9, epoch=-1)
 
@@ -662,50 +660,54 @@ def main():
     nao = nao.cuda()
     logging.info("Encoder-Predictor-Decoder param size = %fMB", utils.count_parameters_in_MB(nao))
 
-    # Train child model
+    
     if child_arch_pool is None:
         logging.info('Architecture pool is not provided, randomly generating now')
         child_arch_pool = utils.generate_arch(args.controller_seed_arch, args.child_nodes, 5)  # [[[conv],[reduc]]]
-    child_arch_pool_prob = None
+    arch_pool = []
+    arch_pool_valid_acc = []
+    for i in range(4):
+        child_arch_pool_prob = []
+        for arch in child_arch_pool:
+            if args.dataset == 'cifar10':
+                tmp_model = NASNetworkCIFAR(args, 10, args.child_layers, args.child_nodes, args.child_channels, args.child_keep_prob, args.child_drop_path_keep_prob,
+                    args.child_use_aux_head, args.steps, arch)
+            elif args.dataset == 'cifar100':
+                tmp_model = NASNetworkCIFAR(args, 100, args.child_layers, args.child_nodes, args.child_channels, args.child_keep_prob, args.child_drop_path_keep_prob,
+                    args.child_use_aux_head, args.steps, arch)
+            else:
+                tmp_model = NASNetworkImageNet(args, 1000, args.child_layers, args.child_nodes, args.child_channels, args.child_keep_prob,
+                    args.child_drop_path_keep_prob, args.child_use_aux_head, args.steps, arch)
+            child_arch_pool_prob.append(utils.count_parameters_in_MB(tmp_model))
+            del tmp_model
 
-    eval_points = utils.generate_eval_points(child_eval_epochs, 0, args.child_epochs)
-    step = 0
-    for epoch in range(1, args.child_epochs + 1):
-        scheduler.step()
-        lr = scheduler.get_lr()[0]
-        logging.info('epoch %d lr %e', epoch, lr)
-        # sample an arch to train
-        train_acc, train_obj, step = child_train(train_queue, model, optimizer, step, child_arch_pool, child_arch_pool_prob, train_criterion)
-        logging.info('train_acc %f', train_acc)
-    
-        if epoch not in eval_points:
-            continue
+        step = 0
+        for epoch in range(1, args.child_epochs + 1):
+            scheduler.step()
+            lr = scheduler.get_lr()[0]
+            logging.info('epoch %d lr %e', epoch, lr)
+            # sample an arch to train
+            train_acc, train_obj, step = child_train(train_queue, model, optimizer, step, child_arch_pool, child_arch_pool_prob, train_criterion)
+            logging.info('train_acc %f', train_acc)
+
         # Evaluate seed archs
-        valid_accuracy_list = child_valid(valid_queue, model, child_arch_pool, eval_criterion)
+        arch_pool += child_arch_pool
+        arch_pool_valid_acc = child_valid(valid_queue, model, arch_pool, eval_criterion)
 
-        # Output archs and evaluated error rate
-        old_archs = child_arch_pool
-        old_archs_perf = valid_accuracy_list
-
-        old_archs_sorted_indices = np.argsort(old_archs_perf)[::-1]
-        old_archs = [old_archs[i] for i in old_archs_sorted_indices]
-        old_archs_perf = [old_archs_perf[i] for i in old_archs_sorted_indices]
-        with open(os.path.join(args.output_dir, 'arch_pool.{}'.format(epoch)), 'w') as fa:
-            with open(os.path.join(args.output_dir, 'arch_pool.perf.{}'.format(epoch)), 'w') as fp:
-                with open(os.path.join(args.output_dir, 'arch_pool'), 'w') as fa_latest:
-                    with open(os.path.join(args.output_dir, 'arch_pool.perf'), 'w') as fp_latest:
-                        for arch, perf in zip(old_archs, old_archs_perf):
-                            arch = ' '.join(map(str, arch[0] + arch[1]))
-                            fa.write('{}\n'.format(arch))
-                            fa_latest.write('{}\n'.format(arch))
-                            fp.write('{}\n'.format(perf))
-                            fp_latest.write('{}\n'.format(perf))
-                            
-        if epoch == args.child_epochs:
+        arch_pool_valid_acc_sorted_indices = np.argsort(arch_pool_valid_acc)[::-1]
+        arch_pool = [arch_pool[i] for i in arch_pool_valid_acc_sorted_indices]
+        arch_pool_valid_acc = [arch_pool_valid_acc[i] for i in arch_pool_valid_acc_sorted_indices]
+        with open(os.path.join(args.output_dir, 'arch_pool.{}'.format(i)), 'w') as fa:
+            with open(os.path.join(args.output_dir, 'arch_pool.perf.{}'.format(i)), 'w') as fp:
+                for arch, perf in zip(arch_pool, arch_pool_valid_acc):
+                    arch = ' '.join(map(str, arch[0] + arch[1]))
+                    fa.write('{}\n'.format(arch))
+                    fp.write('{}\n'.format(perf))
+        if i == 3:
             logging.info('Finish Searching')
             logging.info('Reranking top 5 architectures')
             # reranking top 5
-            top_archs = old_archs[:5]
+            top_archs = arch_pool[:5]
             if args.dataset == 'cifar10':
                 top_archs_perf = train_and_evaluate_top_on_cifar10(top_archs, train_queue, valid_queue)
             elif args.dataset == 'cifar100':
@@ -721,16 +723,16 @@ def main():
                         fa.write('{}\n'.format(arch))
                         fp.write('{}\n'.format(perf))
             break
-
+                            
         # Train Encoder-Predictor-Decoder
-        logging.info('Training Encoder-Predictor-Decoder')
-        encoder_input = list(map(lambda x: utils.parse_arch_to_seq(x[0], 2) + utils.parse_arch_to_seq(x[1], 2), old_archs))
+        logging.info('Training Encoder-Predictor-Decoder for {} time'.format(i))
+        encoder_input = list(map(lambda x: utils.parse_arch_to_seq(x[0], 2) + utils.parse_arch_to_seq(x[1], 2), arch_pool))
         # [[conv, reduc]]
-        min_val = min(old_archs_perf)
-        max_val = max(old_archs_perf)
-        encoder_target = [(i - min_val) / (max_val - min_val) for i in old_archs_perf]
+        min_val = min(arch_pool_valid_acc)
+        max_val = max(arch_pool_valid_acc)
+        encoder_target = [(i - min_val) / (max_val - min_val) for i in arch_pool_valid_acc]
 
-        if args.controller_expand is not None:
+        if not args.controller_expand:
             dataset = list(zip(encoder_input, encoder_target))
             n = len(dataset)
             ratio = 0.9
@@ -771,13 +773,13 @@ def main():
             if nao_epoch % 100 == 0:
                 pa, hs = nao_valid(nao_valid_queue, nao)
                 logging.info("Evaluation on valid data")
-                logging.info('epoch %04d pairwise accuracy %.6f hamming distance %.6f', epoch, pa, hs)
+                logging.info('epoch %04d pairwise accuracy %.6f hamming distance %.6f', nao_epoch, pa, hs)
 
         # Generate new archs
         new_archs = []
         max_step_size = 50
         predict_step_size = 0
-        top100_archs = list(map(lambda x: utils.parse_arch_to_seq(x[0], 2) + utils.parse_arch_to_seq(x[1], 2), old_archs[:100]))
+        top100_archs = list(map(lambda x: utils.parse_arch_to_seq(x[0], 2) + utils.parse_arch_to_seq(x[1], 2), arch_pool[:100]))
         nao_infer_dataset = utils.NAODataset(top100_archs, None, False)
         nao_infer_queue = torch.utils.data.DataLoader(
             nao_infer_dataset, batch_size=len(nao_infer_dataset), shuffle=False, pin_memory=True)
@@ -793,22 +795,9 @@ def main():
             logging.info('%d new archs generated now', len(new_archs))
             if predict_step_size > max_step_size:
                 break
-                # [[conv, reduc]]
-        new_archs = list(map(lambda x: utils.parse_seq_to_arch(x, 2), new_archs))  # [[[conv],[reduc]]]
-        num_new_archs = len(new_archs)
-        logging.info("Generate %d new archs", num_new_archs)
-        # replace bottom archs
-        new_arch_pool = old_archs[:len(old_archs) - num_new_archs] + new_archs
-        logging.info("Totally %d architectures now to train", len(new_arch_pool))
 
-        child_arch_pool = new_arch_pool
-        with open(os.path.join(args.output_dir, 'arch_pool'), 'w') as f:
-            for arch in new_arch_pool:
-                arch = ' '.join(map(str, arch[0] + arch[1]))
-                f.write('{}\n'.format(arch))
-
-        
-        child_arch_pool_prob = None
+        child_arch_pool = list(map(lambda x: utils.parse_seq_to_arch(x, 2), new_archs))  # [[[conv],[reduc]]]
+        logging.info("Generate %d new archs", len(child_arch_pool))
   
 
 if __name__ == '__main__':

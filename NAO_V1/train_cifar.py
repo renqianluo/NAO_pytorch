@@ -3,6 +3,7 @@ import sys
 import glob
 import time
 import copy
+import random
 import numpy as np
 import torch
 import utils
@@ -23,6 +24,7 @@ parser.add_argument('--mode', type=str, default='train',
                     choices=['train', 'test'])
 parser.add_argument('--data', type=str, default='data/cifar10')
 parser.add_argument('--dataset', type=str, default='cifar10', choices=['cifar10, cifar100'])
+parser.add_argument('--split_train_for_valid', type=float, default=None)
 parser.add_argument('--output_dir', type=str, default='models')
 parser.add_argument('--batch_size', type=int, default=128)
 parser.add_argument('--eval_batch_size', type=int, default=500)
@@ -36,7 +38,7 @@ parser.add_argument('--lr_max', type=float, default=0.025)
 parser.add_argument('--lr_min', type=float, default=0)
 parser.add_argument('--keep_prob', type=float, default=0.6)
 parser.add_argument('--drop_path_keep_prob', type=float, default=0.8)
-parser.add_argument('--l2_reg', type=float, default=5e-4) #use 5e-4?
+parser.add_argument('--l2_reg', type=float, default=3e-4)
 parser.add_argument('--arch', type=str, default=None)
 parser.add_argument('--use_aux_head', action='store_true', default=False)
 parser.add_argument('--seed', type=int, default=0)
@@ -116,14 +118,30 @@ def build_cifar10(model_state_dict, optimizer_state_dict, **kwargs):
     epoch = kwargs.pop('epoch')
 
     train_transform, valid_transform = utils._data_transforms_cifar10(args.cutout_size)
-    train_data = dset.CIFAR10(root=args.data, train=True, download=True, transform=train_transform)
-    valid_data = dset.CIFAR10(root=args.data, train=False, download=True, transform=valid_transform)
+    if args.split_train_for_valid is None:
+        train_data = dset.CIFAR10(root=args.data, train=True, download=True, transform=train_transform)
+        valid_data = dset.CIFAR10(root=args.data, train=False, download=True, transform=valid_transform)
     
-    train_queue = torch.utils.data.DataLoader(
-        train_data, batch_size=args.batch_size, shuffle=True, pin_memory=True, num_workers=16)
-    valid_queue = torch.utils.data.DataLoader(
-        valid_data, batch_size=args.eval_batch_size, shuffle=False, pin_memory=True, num_workers=16)
-    
+        train_queue = torch.utils.data.DataLoader(
+            train_data, batch_size=args.batch_size, shuffle=True, pin_memory=True, num_workers=16)
+        valid_queue = torch.utils.data.DataLoader(
+            valid_data, batch_size=args.eval_batch_size, shuffle=False, pin_memory=True, num_workers=16)
+    else:
+        train_data = dset.CIFAR10(root=args.data, train=True, download=True, transform=train_transform)
+        valid_data = dset.CIFAR10(root=args.data, train=True, download=True, transform=valid_transform)
+        n = len(train_data)
+        indices = list(range(n))
+        split = int(np.floor(args.split_train_for_valid * n))
+        np.random.shuffle(indices)
+        train_queue = torch.utils.data.DataLoader(
+            train_data, batch_size=args.batch_size,
+            sampler=torch.utils.data.sampler.SubsetRandomSampler(indices[:split]),
+            pin_memory=True, num_workers=16)
+        valid_queue = torch.utils.data.DataLoader(
+            valid_data, batch_size=args.eval_batch_size,
+            sampler=torch.utils.data.sampler.SubsetRandomSampler(indices[split:n]),
+            pin_memory=True, num_workers=16)
+
     model = NASNetworkCIFAR(args, 10, args.layers, args.nodes, args.channels, args.keep_prob, args.drop_path_keep_prob,
                        args.use_aux_head, args.steps, args.arch)
     logging.info("param size = %fMB", utils.count_parameters_in_MB(model))
@@ -198,6 +216,7 @@ def main():
         logging.info('No GPU found!')
         sys.exit(1)
     
+    random.seed(args.seed)
     np.random.seed(args.seed)
     torch.manual_seed(args.seed)
     torch.cuda.manual_seed(args.seed)
