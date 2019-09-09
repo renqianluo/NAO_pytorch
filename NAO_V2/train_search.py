@@ -667,23 +667,20 @@ def main():
     arch_pool = []
     arch_pool_valid_acc = []
     for i in range(4):
-        if args.child_sample_policy == 'params':
-            child_arch_pool_prob = []
-            for arch in child_arch_pool:
-                if args.dataset == 'cifar10':
-                    tmp_model = NASNetworkCIFAR(args, 10, args.child_layers, args.child_nodes, args.child_channels, args.child_keep_prob, args.child_drop_path_keep_prob,
-                        args.child_use_aux_head, args.steps, arch)
-                elif args.dataset == 'cifar100':
-                    tmp_model = NASNetworkCIFAR(args, 100, args.child_layers, args.child_nodes, args.child_channels, args.child_keep_prob, args.child_drop_path_keep_prob,
-                        args.child_use_aux_head, args.steps, arch)
-                else:
-                    tmp_model = NASNetworkImageNet(args, 1000, args.child_layers, args.child_nodes, args.child_channels, args.child_keep_prob,
-                        args.child_drop_path_keep_prob, args.child_use_aux_head, args.steps, arch)
-                child_arch_pool_prob.append(utils.count_parameters_in_MB(tmp_model))
-                del tmp_model
-        else:
-            child_arch_pool_prob = None
-
+        child_arch_pool_prob = []
+        for arch in child_arch_pool:
+            if args.dataset == 'cifar10':
+                tmp_model = NASNetworkCIFAR(args, 10, args.child_layers, args.child_nodes, args.child_channels, args.child_keep_prob, args.child_drop_path_keep_prob,
+                    args.child_use_aux_head, args.steps, arch)
+            elif args.dataset == 'cifar100':
+                tmp_model = NASNetworkCIFAR(args, 100, args.child_layers, args.child_nodes, args.child_channels, args.child_keep_prob, args.child_drop_path_keep_prob,
+                    args.child_use_aux_head, args.steps, arch)
+            else:
+                tmp_model = NASNetworkImageNet(args, 1000, args.child_layers, args.child_nodes, args.child_channels, args.child_keep_prob,
+                    args.child_drop_path_keep_prob, args.child_use_aux_head, args.steps, arch)
+            child_arch_pool_prob.append(utils.count_parameters_in_MB(tmp_model))
+            del tmp_model
+        
         step = 0
         for epoch in range(1, args.child_epochs + 1):
             scheduler.step()
