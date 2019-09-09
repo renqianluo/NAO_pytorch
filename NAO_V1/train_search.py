@@ -730,7 +730,7 @@ def main():
         max_val = max(old_archs_perf)
         encoder_target = [(i - min_val) / (max_val - min_val) for i in old_archs_perf]
 
-        if not args.controller_expand:
+        if args.controller_expand:
             dataset = list(zip(encoder_input, encoder_target))
             n = len(dataset)
             ratio = 0.9
