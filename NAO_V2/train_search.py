@@ -716,24 +716,6 @@ def main():
                     fa.write('{}\n'.format(arch))
                     fp.write('{}\n'.format(perf))
         if i == 3:
-            logging.info('Finish Searching')
-            logging.info('Reranking top 5 architectures')
-            # reranking top 5
-            top_archs = arch_pool[:5]
-            if args.dataset == 'cifar10':
-                top_archs_perf = train_and_evaluate_top_on_cifar10(top_archs, train_queue, valid_queue)
-            elif args.dataset == 'cifar100':
-                top_archs_perf = train_and_evaluate_top_on_cifar100(top_archs, train_queue, valid_queue)
-            else:
-                top_archs_perf = train_and_evaluate_top_on_imagenet(top_archs, train_queue, valid_queue)
-            top_archs_sorted_indices = np.argsort(top_archs_perf)[::-1]
-            top_archs = [top_archs[i] for i in top_archs_sorted_indices]
-            top_archs_perf = [top_archs_perf[i] for i in top_archs_sorted_indices]
-            with open(os.path.join(args.output_dir, 'arch_pool.final'), 'w') as fa:
-                with open(os.path.join(args.output_dir, 'arch_pool.perf.final'), 'w') as fp:
-                    for arch, perf in zip(top_archs, top_archs_perf):
-                        fa.write('{}\n'.format(arch))
-                        fp.write('{}\n'.format(perf))
             break
                             
         # Train Encoder-Predictor-Decoder
@@ -810,6 +792,26 @@ def main():
 
         child_arch_pool = list(map(lambda x: utils.parse_seq_to_arch(x, 2), new_archs))  # [[[conv],[reduc]]]
         logging.info("Generate %d new archs", len(child_arch_pool))
+
+    logging.info('Finish Searching')
+    logging.info('Reranking top 5 architectures')
+    # reranking top 5
+    top_archs = arch_pool[:5]
+    if args.dataset == 'cifar10':
+        top_archs_perf = train_and_evaluate_top_on_cifar10(top_archs, train_queue, valid_queue)
+    elif args.dataset == 'cifar100':
+        top_archs_perf = train_and_evaluate_top_on_cifar100(top_archs, train_queue, valid_queue)
+    else:
+        top_archs_perf = train_and_evaluate_top_on_imagenet(top_archs, train_queue, valid_queue)
+    top_archs_sorted_indices = np.argsort(top_archs_perf)[::-1]
+    top_archs = [top_archs[i] for i in top_archs_sorted_indices]
+    top_archs_perf = [top_archs_perf[i] for i in top_archs_sorted_indices]
+    with open(os.path.join(args.output_dir, 'arch_pool.final'), 'w') as fa:
+        with open(os.path.join(args.output_dir, 'arch_pool.perf.final'), 'w') as fp:
+            for arch, perf in zip(top_archs, top_archs_perf):
+                arch = ' '.join(map(str, arch[0] + arch[1]))
+                fa.write('{}\n'.format(arch))
+                fp.write('{}\n'.format(perf))
   
 
 if __name__ == '__main__':
