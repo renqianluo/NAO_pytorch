@@ -732,7 +732,7 @@ def main():
         max_val = max(arch_pool_valid_acc)
         encoder_target = [(i - min_val) / (max_val - min_val) for i in arch_pool_valid_acc]
 
-        if not args.controller_expand:
+        if args.controller_expand:
             dataset = list(zip(encoder_input, encoder_target))
             n = len(dataset)
             ratio = 0.9
