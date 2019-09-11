@@ -14,6 +14,7 @@ python train_imagenet.py \
   --batch_size=512 \
   --epochs=250 \
   --arch="$fixed_arc" \
-  --channels=42 \
+  --layers=6 \
+  --channels=44 \
   --use_aux_head \
   --lr=0.4 | tee -a $OUTPUT_DIR/train.log
