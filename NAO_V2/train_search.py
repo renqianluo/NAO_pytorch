@@ -328,12 +328,16 @@ def train_and_evaluate_top_on_cifar10(archs, train_queue, valid_queue):
     res = []
     train_criterion = nn.CrossEntropyLoss().cuda()
     eval_criterion = nn.CrossEntropyLoss().cuda()
-    for arch in archs:
-        objs = utils.AvgrageMeter()
-        top1 = utils.AvgrageMeter()
-        top5 = utils.AvgrageMeter()
-        model = NASNetworkCIFAR(args, 10, args.child_layers, args.child_nodes, args.child_channels, args.child_keep_prob, args.child_drop_path_keep_prob,
-                        args.child_use_aux_head, args.steps, arch)
+    objs = utils.AvgrageMeter()
+    top1 = utils.AvgrageMeter()
+    top5 = utils.AvgrageMeter()
+    for i, arch in enumerate(archs):
+        objs.reset()
+        top1.reset()
+        top5.reset()
+        logging.info('Train and evaluate the {} arch'.format(i+1))
+        model = NASNetworkCIFAR(args, 10, args.child_layers, args.child_nodes, args.child_channels, 0.6, 0.8,
+                        True, args.steps, arch)
         model = model.cuda()
         model.train()
         optimizer = torch.optim.SGD(
@@ -369,7 +373,7 @@ def train_and_evaluate_top_on_cifar10(archs, train_queue, valid_queue):
                 top5.update(prec5.data, n)
             
                 if (step+1) % 100 == 0:
-                    logging.info('Train %03d loss %e top1 %f top5 %f', step+1, objs.avg, top1.avg, top5.avg)
+                    logging.info('Train epoch %03d %03d loss %e top1 %f top5 %f', e+1, step+1, objs.avg, top1.avg, top5.avg)
         objs.reset()
         top1.reset()
         top5.reset()
@@ -398,12 +402,16 @@ def train_and_evaluate_top_on_cifar100(archs, train_queue, valid_queue):
     res = []
     train_criterion = nn.CrossEntropyLoss().cuda()
     eval_criterion = nn.CrossEntropyLoss().cuda()
-    for arch in archs:
-        objs = utils.AvgrageMeter()
-        top1 = utils.AvgrageMeter()
-        top5 = utils.AvgrageMeter()
-        model = NASNetworkCIFAR(args, 100, args.child_layers, args.child_nodes, args.child_channels, args.child_keep_prob, args.child_drop_path_keep_prob,
-                        args.child_use_aux_head, args.steps, arch)
+    objs = utils.AvgrageMeter()
+    top1 = utils.AvgrageMeter()
+    top5 = utils.AvgrageMeter()
+    for i, arch in enumerate(archs):
+        objs.reset()
+        top1.reset()
+        top5.reset()
+        logging.info('Train and evaluate the {} arch'.format(i+1))
+        model = NASNetworkCIFAR(args, 100, args.child_layers, args.child_nodes, args.child_channels, 0.6, 0.8,
+                        True, args.steps, arch)
         model = model.cuda()
         model.train()
         optimizer = torch.optim.SGD(
@@ -439,7 +447,7 @@ def train_and_evaluate_top_on_cifar100(archs, train_queue, valid_queue):
                 top5.update(prec5.data, n)
             
                 if (step+1) % 100 == 0:
-                    logging.info('Train %03d loss %e top1 %f top5 %f', step+1, objs.avg, top1.avg, top5.avg)
+                    logging.info('Train %3d %03d loss %e top1 %f top5 %f', e+1, step+1, objs.avg, top1.avg, top5.avg)
         objs.reset()
         top1.reset()
         top5.reset()
@@ -468,12 +476,16 @@ def train_and_evaluate_top_on_imagenet(archs, train_queue, valid_queue):
     res = []
     train_criterion = nn.CrossEntropyLoss().cuda()
     eval_criterion = nn.CrossEntropyLoss().cuda()
-    for arch in archs:
-        objs = utils.AvgrageMeter()
-        top1 = utils.AvgrageMeter()
-        top5 = utils.AvgrageMeter()
-        model = NASNetworkImageNet(args, 1000, args.child_layers, args.child_nodes, args.child_channels, args.child_keep_prob, args.child_drop_path_keep_prob,
-                        args.child_use_aux_head, args.steps, arch)
+    objs = utils.AvgrageMeter()
+    top1 = utils.AvgrageMeter()
+    top5 = utils.AvgrageMeter()
+    for i, arch in enumerate(archs):
+        objs.reset()
+        top1.reset()
+        top5.reset()
+        logging.info('Train and evaluate the {} arch'.format(i+1))
+        model = NASNetworkImageNet(args, 1000, args.child_layers, args.child_nodes, args.child_channels, 1.0, 1.0,
+                        True, args.steps, arch)
         model = model.cuda()
         model.train()
         optimizer = torch.optim.SGD(
@@ -505,7 +517,7 @@ def train_and_evaluate_top_on_imagenet(archs, train_queue, valid_queue):
             
             if (step+1) % 100 == 0:
                 logging.info('Train %03d loss %e top1 %f top5 %f', step+1, objs.avg, top1.avg, top5.avg)
-            if step == 500:
+            if step+1 == 500:
                 break
 
         objs.reset()
@@ -680,7 +692,7 @@ def main():
                     args.child_drop_path_keep_prob, args.child_use_aux_head, args.steps, arch)
             child_arch_pool_prob.append(utils.count_parameters_in_MB(tmp_model))
             del tmp_model
-
+        
         step = 0
         for epoch in range(1, args.child_epochs + 1):
             scheduler.step()
@@ -704,24 +716,6 @@ def main():
                     fa.write('{}\n'.format(arch))
                     fp.write('{}\n'.format(perf))
         if i == 3:
-            logging.info('Finish Searching')
-            logging.info('Reranking top 5 architectures')
-            # reranking top 5
-            top_archs = arch_pool[:5]
-            if args.dataset == 'cifar10':
-                top_archs_perf = train_and_evaluate_top_on_cifar10(top_archs, train_queue, valid_queue)
-            elif args.dataset == 'cifar100':
-                top_archs_perf = train_and_evaluate_top_on_cifar100(top_archs, train_queue, valid_queue)
-            else:
-                top_archs_perf = train_and_evaluate_top_on_imagenet(top_archs, train_queue, valid_queue)
-            top_archs_sorted_indices = np.argsort(top_archs_perf)[::-1]
-            top_archs = [top_archs[i] for i in top_archs_sorted_indices]
-            top_archs_perf = [top_archs_perf[i] for i in top_archs_sorted_indices]
-            with open(os.path.join(args.output_dir, 'arch_pool.final'), 'w') as fa:
-                with open(os.path.join(args.output_dir, 'arch_pool.perf.final'), 'w') as fp:
-                    for arch, perf in zip(top_archs, top_archs_perf):
-                        fa.write('{}\n'.format(arch))
-                        fp.write('{}\n'.format(perf))
             break
                             
         # Train Encoder-Predictor-Decoder
@@ -798,6 +792,26 @@ def main():
 
         child_arch_pool = list(map(lambda x: utils.parse_seq_to_arch(x, 2), new_archs))  # [[[conv],[reduc]]]
         logging.info("Generate %d new archs", len(child_arch_pool))
+
+    logging.info('Finish Searching')
+    logging.info('Reranking top 5 architectures')
+    # reranking top 5
+    top_archs = arch_pool[:5]
+    if args.dataset == 'cifar10':
+        top_archs_perf = train_and_evaluate_top_on_cifar10(top_archs, train_queue, valid_queue)
+    elif args.dataset == 'cifar100':
+        top_archs_perf = train_and_evaluate_top_on_cifar100(top_archs, train_queue, valid_queue)
+    else:
+        top_archs_perf = train_and_evaluate_top_on_imagenet(top_archs, train_queue, valid_queue)
+    top_archs_sorted_indices = np.argsort(top_archs_perf)[::-1]
+    top_archs = [top_archs[i] for i in top_archs_sorted_indices]
+    top_archs_perf = [top_archs_perf[i] for i in top_archs_sorted_indices]
+    with open(os.path.join(args.output_dir, 'arch_pool.final'), 'w') as fa:
+        with open(os.path.join(args.output_dir, 'arch_pool.perf.final'), 'w') as fp:
+            for arch, perf in zip(top_archs, top_archs_perf):
+                arch = ' '.join(map(str, arch[0] + arch[1]))
+                fa.write('{}\n'.format(arch))
+                fp.write('{}\n'.format(perf))
   
 
 if __name__ == '__main__':
