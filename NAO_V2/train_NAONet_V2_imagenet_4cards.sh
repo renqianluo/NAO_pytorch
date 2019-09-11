@@ -12,7 +12,6 @@ python train_imagenet.py \
   --data=$DATA_DIR \
   --output_dir=$OUTPUT_DIR \
   --batch_size=512 \
-  --epochs=250 \
   --arch="$fixed_arc" \
   --layers=6 \
   --channels=44 \
