@@ -13,6 +13,6 @@ python train_imagenet.py \
   --output_dir=$OUTPUT_DIR \
   --batch_size=512 \
   --arch="$fixed_arc" \
-  --channels=52 \
   --use_aux_head \
+  --channels=52 \
   --lr=0.4 | tee -a $OUTPUT_DIR/train.log

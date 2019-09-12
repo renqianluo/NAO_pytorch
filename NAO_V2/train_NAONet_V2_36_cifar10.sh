@@ -12,4 +12,5 @@ python train_cifar.py \
   --data=$DATA_DIR \
   --output_dir=$OUTPUT_DIR \
   --arch="$fixed_arc" \
+  --use_aux_head \
   --cutout_size=16 | tee -a $OUTPUT_DIR/train.log
