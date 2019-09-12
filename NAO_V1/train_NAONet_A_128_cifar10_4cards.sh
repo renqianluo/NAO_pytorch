@@ -14,5 +14,6 @@ python train_cifar.py \
   --arch="$fixed_arc" \
   --channels=128 \
   --cutout_size=16 \
+  --l2_reg=5e-4 \
   --keep_prob=0.6 \
   --drop_path_keep_prob=0.7 | tee -a $OUTPUT_DIR/train.log
