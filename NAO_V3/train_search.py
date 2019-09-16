@@ -296,7 +296,6 @@ def nao_data_preprocess(encoder_input, encoder_target):
 
 
 def train_nao(model, encoder_input, encoder_target):
-    logging.info('Pre-train NAO')
     train_encoder_input, train_encoder_target, valid_encoder_input, valid_encoder_target = nao_data_preprocess(encoder_input, encoder_target)
     logging.info('Train data: {}\tValid data: {}'.format(len(train_encoder_input), len(valid_encoder_input)))
     nao_train_dataset = utils.NAODataset(train_encoder_input, train_encoder_target, True, swap=True if args.controller_expand is None else False)
@@ -314,7 +313,6 @@ def train_nao(model, encoder_input, encoder_target):
             pa, hs = nao_valid(nao_valid_queue, model)
             logging.info("Evaluation on valid data")
             logging.info('epoch %04d pairwise accuracy %.6f hamming distance %.6f', nao_epoch, pa, hs)
-    logging.info('Finish pre-training')
     return model
 
 
@@ -437,7 +435,7 @@ def main():
             break
                             
         # Train Encoder-Predictor-Decoder
-        logging.info('Training Encoder-Predictor-Decoder for {} time'.format(i))
+        logging.info('Training Encoder-Predictor-Decoder')
         encoder_input = list(map(lambda x: utils.parse_arch_to_seq(x[0]) + utils.parse_arch_to_seq(x[1]), arch_pool))
         # [[conv, reduc]]
         min_val = min(arch_pool_valid_acc)
@@ -445,13 +443,18 @@ def main():
         encoder_target = list(map(lambda x: (x - min_val) / (max_val - min_val), arch_pool_valid_acc))
 
         # Pre-train NAO
+        logging.info('Pre-train NAO')
         nao = train_nao(nao, encoder_input, encoder_target)
+        logging.info('Finish pre-training NAO')
         # Generate synthetic data
+        logging.info('Generate synthetic data for NAO')
         synthetic_encoder_input, synthetic_encoder_target = generate_synthetic_nao_data(nao, encoder_input, args.controller_seed_arch * 10 - len(arch_pool))
         all_encoder_input = encoder_input + synthetic_encoder_input
         all_encoder_target = encoder_target + synthetic_encoder_target
         # Train NAO
+        logging.info('Train NAO')
         nao = train_nao(nao, all_encoder_input, all_encoder_target)
+        logging.info('Finish training NAO')
 
         # Generate new archs
         new_archs = []
