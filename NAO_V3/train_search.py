@@ -320,7 +320,7 @@ def generate_synthetic_nao_data(model, exclude=[], maxn=1000):
     synthetic_encoder_input = []
     synthetic_encoder_target = []
     while len(synthetic_encoder_input) < maxn:
-        synthetic_arch = utils.generate_arch(1, args.child_nodes, args.num_ops)[0]
+        synthetic_arch = utils.generate_arch(1, args.child_nodes, args.child_num_ops)[0]
         if synthetic_arch not in exclude and synthetic_arch not in synthetic_encoder_input:
             synthetic_encoder_input.append(synthetic_arch)
     
@@ -405,7 +405,7 @@ def main():
     
     if child_arch_pool is None:
         logging.info('Architecture pool is not provided, randomly generating now')
-        child_arch_pool = utils.generate_arch(args.controller_seed_arch, args.child_nodes, args.num_ops)  # [[[conv],[reduc]]]
+        child_arch_pool = utils.generate_arch(args.controller_seed_arch, args.child_nodes, args.child_num_ops)  # [[[conv],[reduc]]]
     arch_pool = []
     arch_pool_valid_acc = []
     for i in range(4):
