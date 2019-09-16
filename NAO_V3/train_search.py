@@ -304,7 +304,6 @@ def train_nao(model, encoder_input, encoder_target):
     nao_valid_queue = torch.utils.data.DataLoader(
         nao_valid_dataset, batch_size=args.controller_batch_size, shuffle=False, pin_memory=True)
     nao_optimizer = torch.optim.Adam(model.parameters(), lr=args.controller_lr, weight_decay=args.controller_l2_reg)
-    model.train()
     for nao_epoch in range(1, args.controller_epochs+1):
         nao_loss, nao_mse, nao_ce = nao_train(nao_train_queue, model, nao_optimizer)
         logging.info("epoch %04d train loss %.6f mse %.6f ce %.6f", nao_epoch, nao_loss, nao_mse, nao_ce)
