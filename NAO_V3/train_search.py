@@ -321,6 +321,7 @@ def generate_synthetic_nao_data(model, exclude=[], maxn=1000):
     synthetic_encoder_target = []
     while len(synthetic_encoder_input) < maxn:
         synthetic_arch = utils.generate_arch(1, args.child_nodes, args.child_num_ops)[0]
+        synthetic_arch = utils.parse_arch_to_seq(synthetic_arch[0]) + utils.parse_arch_to_seq(synthetic_arch[1])
         if synthetic_arch not in exclude and synthetic_arch not in synthetic_encoder_input:
             synthetic_encoder_input.append(synthetic_arch)
     
