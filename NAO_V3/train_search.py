@@ -46,7 +46,6 @@ parser.add_argument('--child_arch_pool', type=str, default=None)
 parser.add_argument('--child_label_smooth', type=float, default=0.1, help='label smoothing')
 parser.add_argument('--controller_seed_arch', type=int, default=100)
 parser.add_argument('--controller_expand', type=int, default=10)
-parser.add_argument('--controller_new_arch', type=int, default=100)
 parser.add_argument('--controller_encoder_layers', type=int, default=1)
 parser.add_argument('--controller_encoder_hidden_size', type=int, default=64)
 parser.add_argument('--controller_encoder_emb_size', type=int, default=32)
@@ -142,7 +141,7 @@ def child_estimate(train_queue, valid_queue, arch_pool, train_criterion, eval_cr
             weight_decay=args.child_l2_reg,
         )
 
-        logging.info('Arch: %s', ' '.join(map(str, arch[0] + arch[1])))
+        logging.info('%d arch: %s', i+1, ' '.join(map(str, arch[0] + arch[1])))
         logging.info('Size: {}MB'.format(model_size))
         logging.info('Training budget: {}'.format(budget))
         model.train()
@@ -359,7 +358,7 @@ def main():
     else:
         args.num_class = 10
     args.child_num_ops = len(OPERATIONS_CIFAR)
-    args.controller_encoder_vocab_size = 1 + (args.child_nodes + 2 -1 ) + args.child_num_ops
+    args.controller_encoder_vocab_size = 1 + ( args.child_nodes + 2 - 1 ) + args.child_num_ops
     args.controller_decoder_vocab_size = args.controller_encoder_vocab_size
     args.steps = int(np.ceil(45000 / args.child_batch_size)) * args.child_budget
 
@@ -465,14 +464,14 @@ def main():
         nao_infer_dataset = utils.NAODataset(top100_archs, None, False)
         nao_infer_queue = torch.utils.data.DataLoader(
             nao_infer_dataset, batch_size=len(nao_infer_dataset), shuffle=False, pin_memory=True)
-        while len(new_archs) < args.controller_new_arch:
+        while len(new_archs) < args.controller_seed_arch:
             predict_step_size += 1
             logging.info('Generate new architectures with step size %d', predict_step_size)
             new_arch = nao_infer(nao_infer_queue, nao, predict_step_size, direction='+')
             for arch in new_arch:
                 if arch not in encoder_input and arch not in new_archs:
                     new_archs.append(arch)
-                if len(new_archs) >= args.controller_new_arch:
+                if len(new_archs) >= args.controller_seed_arch:
                     break
             logging.info('%d new archs generated now', len(new_archs))
             if predict_step_size > max_step_size:

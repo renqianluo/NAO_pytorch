@@ -492,8 +492,8 @@ def build_dag(arch):
 def parse_arch_to_seq(cell, nodes=B):
     seq = []
     for i in range(nodes):
-        prev_node1 = cell[4*i]+1
-        prev_node2 = cell[4*i+2]+1
+        prev_node1 = cell[4*i] + 1
+        prev_node2 = cell[4*i+2] + 1
         op1 = cell[4*i+1] + 7
         op2 = cell[4*i+3] + 7
         seq.extend([prev_node1, op1, prev_node2, op2])
