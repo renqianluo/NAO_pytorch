@@ -44,6 +44,7 @@ parser.add_argument('--child_l2_reg', type=float, default=3e-4)
 parser.add_argument('--child_use_aux_head', action='store_true', default=False)
 parser.add_argument('--child_arch_pool', type=str, default=None)
 parser.add_argument('--child_label_smooth', type=float, default=0.1, help='label smoothing')
+parser.add_argument('--child_adaptive_budget', action='store_true', default=False)
 parser.add_argument('--controller_seed_arch', type=int, default=100)
 parser.add_argument('--controller_expand', type=int, default=10)
 parser.add_argument('--controller_encoder_layers', type=int, default=1)
@@ -125,8 +126,11 @@ def child_estimate(train_queue, valid_queue, arch_pool, train_criterion, eval_cr
     model_sizes = list(map(lambda x:utils.count_parameters_in_MB(
         NASNetworkCIFAR(args, args.num_class, args.child_layers, args.child_nodes, args.child_channels, args.child_keep_prob, args.child_drop_path_keep_prob,
                        args.child_use_aux_head, args.child_budget, x)), arch_pool))
-    min_size = min(model_sizes)
-    budgets = list(map(lambda x:math.ceil(args.child_budget * (x / min_size)), model_sizes))
+    if args.child_adaptive_budget:
+        min_size = min(model_sizes)
+        budgets = list(map(lambda x:math.ceil(args.child_budget * (x / min_size)), model_sizes))
+    else:
+        budgets = list(map(lambda x:args.child_budget, model_sizes))
     valid_acc = []
     
     for i, (arch, model_size, budget) in enumerate(zip(arch_pool, model_sizes, budgets)):
@@ -173,7 +177,6 @@ def child_estimate(train_queue, valid_queue, arch_pool, train_criterion, eval_cr
                 break
         logging.info('loss %e top1 %f', objs.avg, top1.avg)
 
-        objs.reset()
         top1.reset()
         with torch.no_grad():
             model.eval()
@@ -185,7 +188,6 @@ def child_estimate(train_queue, valid_queue, arch_pool, train_criterion, eval_cr
                 
                 prec1 = utils.accuracy(logits, targets, topk=(1,))[0]
                 n = inputs.size(0)
-                objs.update(loss.data, n)
                 top1.update(prec1.data, n)
             valid_acc.append(top1.avg)
 
