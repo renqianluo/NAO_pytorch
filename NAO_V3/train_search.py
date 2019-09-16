@@ -127,13 +127,14 @@ def child_estimate(train_queue, valid_queue, arch_pool, train_criterion, eval_cr
         NASNetworkCIFAR(args, args.num_class, args.child_layers, args.child_nodes, args.child_channels, args.child_keep_prob, args.child_drop_path_keep_prob,
                        args.child_use_aux_head, args.child_budget, x)), arch_pool))
     min_size = min(model_sizes)
-    budgets = list(map(lambda x:args.child_budget * (x / min_size), model_sizes))
+    budgets = list(map(lambda x:math.ceil(args.child_budget * (x / min_size)), model_sizes))
     valid_acc = []
     
     for i, (arch, model_size, budget) in enumerate(zip(arch_pool, model_sizes, budgets)):
         step = 0
         model = NASNetworkCIFAR(args, args.num_class, args.child_layers, args.child_nodes, args.child_channels, args.child_keep_prob, args.child_drop_path_keep_prob,
                        args.child_use_aux_head, budget, arch)
+        model = model.cuda()
         optimizer = torch.optim.SGD(
             model.parameters(),
             args.child_lr_max,
@@ -304,7 +305,8 @@ def train_nao(model, encoder_input, encoder_target):
         nao_train_dataset, batch_size=args.controller_batch_size, shuffle=True, pin_memory=True)
     nao_valid_queue = torch.utils.data.DataLoader(
         nao_valid_dataset, batch_size=args.controller_batch_size, shuffle=False, pin_memory=True)
-    nao_optimizer = torch.optim.Adam(nao.parameters(), lr=args.controller_lr, weight_decay=args.controller_l2_reg)
+    nao_optimizer = torch.optim.Adam(model.parameters(), lr=args.controller_lr, weight_decay=args.controller_l2_reg)
+    model.train()
     for nao_epoch in range(1, args.controller_epochs+1):
         nao_loss, nao_mse, nao_ce = nao_train(nao_train_queue, model, nao_optimizer)
         logging.info("epoch %04d train loss %.6f mse %.6f ce %.6f", nao_epoch, nao_loss, nao_mse, nao_ce)
