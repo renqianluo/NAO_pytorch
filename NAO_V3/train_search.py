@@ -327,13 +327,12 @@ def generate_synthetic_nao_data(model, exclude=[], maxn=1000):
             synthetic_encoder_input.append(synthetic_arch)
     
     nao_synthetic_dataset = utils.NAODataset(synthetic_encoder_input, None, False)      
-    nao_synthetic_queue = utils.NAODataset(nao_synthetic_dataset, batch_size=len(nao_synthetic_dataset), shuffle=False, pin_memory=True)
+    nao_synthetic_queue = torch.utils.data.DataLoader(nao_synthetic_dataset, batch_size=len(nao_synthetic_dataset), shuffle=False, pin_memory=True)
 
     with torch.no_grad():
         model.eval()
         for sample in nao_synthetic_queue:
             encoder_input = sample['encoder_input'].cuda()
-            encoder_input = encoder_input.cuda()
             _, _, _, predict_value = model.encoder(encoder_input)
             synthetic_encoder_target += predict_value.data.squeeze().tolist()
     assert len(synthetic_encoder_input) == len(synthetic_encoder_target)
