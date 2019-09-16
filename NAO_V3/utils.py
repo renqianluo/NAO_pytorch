@@ -489,76 +489,29 @@ def build_dag(arch):
     return conv_dag, reduc_dag
 
 
-def parse_arch_to_seq(cell, branch_length):
-    assert branch_length in [2, 3]
+def parse_arch_to_seq(cell, nodes=B):
     seq = []
-    
-    def _parse_op(op):
-        if op == 0:
-            return 7, 12
-        if op == 1:
-            return 8, 11
-        if op == 2:
-            return 8, 12
-        if op == 3:
-            return 9, 11
-        if op == 4:
-            return 10, 11
-
-    for i in range(B):
+    for i in range(nodes):
         prev_node1 = cell[4*i]+1
         prev_node2 = cell[4*i+2]+1
-        if branch_length == 2:
-            op1 = cell[4*i+1] + 7
-            op2 = cell[4*i+3] + 7
-            seq.extend([prev_node1, op1, prev_node2, op2])
-        else:
-            op11, op12 = _parse_op(cell[4*i+1])
-            op21, op22 = _parse_op(cell[4*i+3])
-            seq.extend([prev_node1, op11, op12, prev_node2, op21, op22]) #nopknopk
+        op1 = cell[4*i+1] + 7
+        op2 = cell[4*i+3] + 7
+        seq.extend([prev_node1, op1, prev_node2, op2])
     return seq
 
 
-def parse_seq_to_arch(seq, branch_length):
+def parse_seq_to_arch(seq, nodes=B):
     n = len(seq)
-    assert branch_length in [2, 3]
-    assert n // 2 // 5 // 2 == branch_length
     
     def _parse_cell(cell_seq):
         cell_arch = []
-        
-        def _recover_op(op1, op2):
-            if op1 == 7:
-                return 0
-            if op1 == 8:
-                if op2 == 11:
-                    return 1
-                if op2 == 12:
-                    return 2
-            if op1 == 9:
-                return 3
-            if op1 == 10:
-                return 4
-        if branch_length == 2:
-            for i in range(B):
-                p1 = cell_seq[4*i] - 1
-                op1 = cell_seq[4*i+1] - 7
-                p2 = cell_seq[4*i+2] - 1
-                op2 = cell_seq[4*i+3] - 7
-                cell_arch.extend([p1, op1, p2, op2])
-            return cell_arch
-        else:
-            for i in range(B):
-                p1 = cell_seq[6*i] - 1
-                op11 = cell_seq[6*i+1]
-                op12 = cell_seq[6*i+2]
-                op1 = _recover_op(op11, op12)
-                p2 = cell_seq[6*i+3] - 1
-                op21 = cell_seq[6*i+4]
-                op22 = cell_seq[6*i+5]
-                op2 = _recover_op(op21, op22)
-                cell_arch.extend([p1, op1, p2, op2])
-            return cell_arch
+        for i in range(nodes):
+            p1 = cell_seq[4*i] - 1
+            op1 = cell_seq[4*i+1] - 7
+            p2 = cell_seq[4*i+2] - 1
+            op2 = cell_seq[4*i+3] - 7
+            cell_arch.extend([p1, op1, p2, op2])
+        return cell_arch
     conv_seq = seq[:n//2]
     reduc_seq = seq[n//2:]
     conv_arch = _parse_cell(conv_seq)
@@ -601,15 +554,3 @@ def hamming_distance(la, lb):
         line2 = lb[i]
         dis += _hamming_distance(line1, line2)
     return dis / N
-
-
-def generate_eval_points(eval_epochs, stand_alone_epoch, total_epochs):
-    if isinstance(eval_epochs, list):
-        return eval_epochs
-    assert isinstance(eval_epochs, int)
-    res = []
-    eval_point = eval_epochs - stand_alone_epoch
-    while eval_point + stand_alone_epoch <= total_epochs:
-        res.append(eval_point)
-        eval_point += eval_epochs
-    return res

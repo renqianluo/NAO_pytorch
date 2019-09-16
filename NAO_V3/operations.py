@@ -34,10 +34,7 @@ class AuxHeadCIFAR(nn.Module):
         self.relu3 = nn.ReLU(inplace=True)
         self.classifier = nn.Linear(768, classes)
         
-    def forward(self, x, bn_train=False):
-        if bn_train:
-            self.bn1.train()
-            self.bn2.train()
+    def forward(self, x):
         x = self.relu1(x)
         x = self.avg_pool(x)
         x = self.conv1(x)
@@ -64,10 +61,7 @@ class AuxHeadImageNet(nn.Module):
         self.relu3 = nn.ReLU(inplace=True)
         self.classifier = nn.Linear(768, classes)
     
-    def forward(self, x, bn_train=False):
-        if bn_train:
-            self.bn1.train()
-            self.bn2.train()
+    def forward(self, x):
         x = self.relu1(x)
         x = self.avg_pool(x)
         x = self.conv1(x)
@@ -116,7 +110,7 @@ class Conv(nn.Module):
                 nn.BatchNorm2d(C_out, affine=affine),
             )
 
-    def forward(self, x, bn_train=False):
+    def forward(self, x):
         x = self.ops(x)
         return x
     

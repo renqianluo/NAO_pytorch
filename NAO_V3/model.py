@@ -30,12 +30,12 @@ class Node(nn.Module):
         y_shape = list(y_shape)
         
         x_stride = stride if x_id in [0, 1] else 1
-        self.x_op = OPERATIONS_CIFAR[x_op](channels, channels, stride, x_shape, True)
+        self.x_op = OPERATIONS_CIFAR[x_op](channels, channels, x_stride, x_shape, True)
         x_shape = [x_shape[0] // x_stride, x_shape[1] // x_stride, channels]
         self.multi_adds += self.x_op.multi_adds
 
         y_stride = stride if y_id in [0, 1] else 1
-        self.y_op = OPERATIONS_CIFAR[y_op](channels, channels, stride, y_shape, True)
+        self.y_op = OPERATIONS_CIFAR[y_op](channels, channels, y_stride, y_shape, True)
         y_shape = [y_shape[0] // y_stride, y_shape[1] // y_stride, channels]
         self.multi_adds += self.y_op.multi_adds
         

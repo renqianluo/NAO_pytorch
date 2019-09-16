@@ -161,7 +161,7 @@ def child_estimate(train_queue, valid_queue, arch_pool, train_criterion, eval_cr
                 nn.utils.clip_grad_norm_(model.parameters(), args.child_grad_bound)
                 optimizer.step()
                 
-                prec1 = utils.accuracy(logits, targets, topk=(1,))
+                prec1 = utils.accuracy(logits, targets, topk=(1,))[0]
                 n = inputs.size(0)
                 objs.update(loss.data, n)
                 top1.update(prec1.data, n)
@@ -172,7 +172,7 @@ def child_estimate(train_queue, valid_queue, arch_pool, train_criterion, eval_cr
                     break
             if step == budget:
                 break
-        logging.info('loss %e top1 %f top5 %f', objs.avg, top1.avg, top5.avg)
+        logging.info('loss %e top1 %f', objs.avg, top1.avg)
 
         objs.reset()
         top1.reset()
@@ -181,10 +181,10 @@ def child_estimate(train_queue, valid_queue, arch_pool, train_criterion, eval_cr
             for inputs, targets in valid_queue:
                 inputs = inputs.cuda()
                 targets = targets.cuda()
-                logits, _ = model(inputs, arch, bn_train=True)
+                logits, _ = model(inputs, arch)
                 loss = eval_criterion(logits, targets)
                 
-                prec1 = utils.accuracy(logits, targets, topk=(1,))
+                prec1 = utils.accuracy(logits, targets, topk=(1,))[0]
                 n = inputs.size(0)
                 objs.update(loss.data, n)
                 top1.update(prec1.data, n)
@@ -361,7 +361,7 @@ def main():
     else:
         args.num_class = 10
     args.child_num_ops = len(OPERATIONS_CIFAR)
-    args.controller_encoder_vocab_size = 1 + args.child_nodes + args.child_num_ops
+    args.controller_encoder_vocab_size = 1 + (args.child_nodes + 2 -1 ) + args.child_num_ops
     args.controller_decoder_vocab_size = args.controller_encoder_vocab_size
     args.steps = int(np.ceil(45000 / args.child_batch_size)) * args.child_budget
 
@@ -439,7 +439,7 @@ def main():
                             
         # Train Encoder-Predictor-Decoder
         logging.info('Training Encoder-Predictor-Decoder for {} time'.format(i))
-        encoder_input = list(map(lambda x: utils.parse_arch_to_seq(x[0], 2) + utils.parse_arch_to_seq(x[1], 2), arch_pool))
+        encoder_input = list(map(lambda x: utils.parse_arch_to_seq(x[0]) + utils.parse_arch_to_seq(x[1]), arch_pool))
         # [[conv, reduc]]
         min_val = min(arch_pool_valid_acc)
         max_val = max(arch_pool_valid_acc)
@@ -458,7 +458,7 @@ def main():
         new_archs = []
         max_step_size = 50
         predict_step_size = 0
-        top100_archs = list(map(lambda x: utils.parse_arch_to_seq(x[0], 2) + utils.parse_arch_to_seq(x[1], 2), arch_pool[:100]))
+        top100_archs = list(map(lambda x: utils.parse_arch_to_seq(x[0]) + utils.parse_arch_to_seq(x[1]), arch_pool[:100]))
         nao_infer_dataset = utils.NAODataset(top100_archs, None, False)
         nao_infer_queue = torch.utils.data.DataLoader(
             nao_infer_dataset, batch_size=len(nao_infer_dataset), shuffle=False, pin_memory=True)
@@ -475,7 +475,7 @@ def main():
             if predict_step_size > max_step_size:
                 break
 
-        child_arch_pool = list(map(lambda x: utils.parse_seq_to_arch(x, 2), new_archs))  # [[[conv],[reduc]]]
+        child_arch_pool = list(map(lambda x: utils.parse_seq_to_arch(x), new_archs))  # [[[conv],[reduc]]]
         logging.info("Generate %d new archs", len(child_arch_pool))
 
     logging.info('Finish Searching')
