@@ -175,7 +175,7 @@ def child_estimate(train_queue, valid_queue, arch_pool, train_criterion, eval_cr
                     break
             if step == budget:
                 break
-        logging.info('Train: loss %e top1 %f', objs.avg, top1.avg)
+        logging.info('Training loss %e, top1 acc %f', objs.avg, top1.avg)
 
         top1.reset()
         with torch.no_grad():
@@ -189,7 +189,7 @@ def child_estimate(train_queue, valid_queue, arch_pool, train_criterion, eval_cr
                 prec1 = utils.accuracy(logits, targets, topk=(1,))[0]
                 n = inputs.size(0)
                 top1.update(prec1.data, n)
-            logging.info('Valid: top1 %f', top1.avg)
+            logging.info('Valid top1 acc %f', top1.avg)
             valid_acc.append(top1.avg)
 
     return valid_acc
