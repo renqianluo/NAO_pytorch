@@ -38,7 +38,7 @@ parser.add_argument('--lr_max', type=float, default=0.025)
 parser.add_argument('--lr_min', type=float, default=0)
 parser.add_argument('--keep_prob', type=float, default=0.6)
 parser.add_argument('--drop_path_keep_prob', type=float, default=0.8)
-parser.add_argument('--l2_reg', type=float, default=3e-4)
+parser.add_argument('--l2_reg', type=float, default=5e-4)
 parser.add_argument('--arch', type=str, default=None)
 parser.add_argument('--use_aux_head', action='store_true', default=False)
 parser.add_argument('--seed', type=int, default=0)
@@ -232,14 +232,12 @@ def main():
         logging.info('No GPU found!')
         sys.exit(1)
     
-    random.seed(args.seed)
     np.random.seed(args.seed)
     torch.manual_seed(args.seed)
     torch.cuda.manual_seed(args.seed)
     torch.cuda.manual_seed_all(args.seed)
     cudnn.enabled = True
-    cudnn.benchmark = False
-    cudnn.deterministic = True
+    cudnn.benchmark = True
     
     args.steps = int(np.ceil(50000 / args.batch_size)) * args.epochs
     logging.info("Args = %s", args)

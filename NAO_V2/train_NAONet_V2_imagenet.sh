@@ -6,7 +6,7 @@ DATA_DIR=imagenet/raw-data
 
 mkdir -p $OUTPUT_DIR
 
-fixed_arc="0 1 0 4 0 1 1 0 2 0 2 4 2 4 2 1 2 0 3 2 1 3 0 4 0 1 1 0 0 1 0 2 2 0 0 1 1 0 1 4"
+fixed_arc="0 0 0 3 0 1 2 1 0 2 0 0 0 3 0 0 0 0 0 0 0 0 0 0 1 4 0 1 2 1 0 2 0 0 0 3 0 0 5 0"
 
 python train_imagenet.py \
   --data=$DATA_DIR \
