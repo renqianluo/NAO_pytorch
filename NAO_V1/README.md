@@ -40,9 +40,9 @@ You can train the best architecture we discovered by NAO(show in Fig. 1 in the A
 ### CIFAR-10
 To train on CIFAR-10, refer to:
 
-| Dataset | Script | GPU | Time | Checkpoint| Top1 Error Rate |
+| Dataset | Script | GPU | Time | Checkpoint| Error Rate |
 | ------------- | ------------- | ------------- | ------------- | ------------- | ------------- |
-|CIFAR-10| train_NAONet_A_36_cifar10.sh | 1 P40 | 3 days | TBD | 2.48% |
+|CIFAR-10| train_NAONet_A_36_cifar10.sh | 1 P40 | 2 days | [`Google Drive`](https://drive.google.com/file/d/1Cl9v-hSt4LPYZTWlNE9XHNu2anmiZvk8/view?usp=sharing) | 2.48% |
 |CIFAR-10| train_NAONet_A_128_cifar10_4cards.sh | 4 P40 | 5 days | [`Google Drive`](https://drive.google.com/file/d/1Xs5ajX-buseRzOZg9gTJ0Vo4u_OEQFff/view?usp=sharing) | 1.93% |
 
 To train NAONet-A-36 (NAONet-A with channel numbers of 36) on single GPU, run:

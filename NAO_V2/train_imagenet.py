@@ -213,14 +213,12 @@ def main():
         logging.info('No GPU found!')
         sys.exit(1)
     
-    random.seed(args.seed)
     np.random.seed(args.seed)
     torch.manual_seed(args.seed)
     torch.cuda.manual_seed(args.seed)
     torch.cuda.manual_seed_all(args.seed)
     cudnn.enabled = True
-    cudnn.benchmark = False
-    cudnn.deterministic = True
+    cudnn.benchmark = True
     
     logging.info("Args = %s", args)
     
