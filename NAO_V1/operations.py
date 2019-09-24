@@ -81,11 +81,12 @@ class AuxHeadImageNet(nn.Module):
 
 
 class ReLUConvBN(nn.Module):
-    def __init__(self, C_in, C_out, kernel_size, stride, padding, affine=True):
+    def __init__(self, C_in, C_out, kernel_size, stride, padding, shape, affine=True):
         super(ReLUConvBN, self).__init__()
         self.relu = nn.ReLU(inplace=INPLACE)
         self.conv = nn.Conv2d(C_in, C_out, kernel_size, stride=stride, padding=padding, bias=False)
         self.bn = nn.BatchNorm2d(C_out, affine=affine)
+        self.multi_adds = C_in * C_out * kernel_size * kernel_size * (shape[0] // stride) * (shape[0] // stride)
     
     def forward(self, x, bn_train=False):
         x = self.relu(x)
@@ -97,7 +98,7 @@ class ReLUConvBN(nn.Module):
 
 
 class Conv(nn.Module):
-    def __init__(self, C_in, C_out, kernel_size, stride, padding, affine=True):
+    def __init__(self, C_in, C_out, kernel_size, stride, padding, shape, affine=True):
         super(Conv, self).__init__()
         if isinstance(kernel_size, int):
             self.ops = nn.Sequential(
@@ -105,6 +106,7 @@ class Conv(nn.Module):
                 nn.Conv2d(C_in, C_out, kernel_size, stride=stride, padding=padding, bias=False),
                 nn.BatchNorm2d(C_out, affine=affine)
             )
+            self.multi_adds = kernel_size * kernel_size * C_in * C_out * (shape[0] // stride) * (shape[0] // stride)
         else:
             assert isinstance(kernel_size, tuple)
             k1, k2 = kernel_size[0], kernel_size[1]
@@ -116,8 +118,9 @@ class Conv(nn.Module):
                 nn.Conv2d(C_out, C_out, (k2, k1), stride=(stride, 1), padding=padding[1], bias=False),
                 nn.BatchNorm2d(C_out, affine=affine),
             )
+            self.multi_adds = 2 * k1 * k2 * C_in * C_out * (shape[0] // stride) * (shape[0] // stride)
 
-    def forward(self, x, bn_train=False):
+    def forward(self, x):
         x = self.ops(x)
         return x
 
@@ -175,14 +178,10 @@ class WSBN(nn.Module):
         return F.batch_norm(
             x, self.running_mean, self.running_var, self.weight[x_id], self.bias[x_id],
             training, self.momentum, self.eps)
-
-    def __repr__(self):
-        return ('{name}({num_features}, eps={eps}, momentum={momentum},'
-                ' affine={affine})'.format(name=self.__class__.__name__, **self.__dict__))
     
     
 class SepConv(nn.Module):
-    def __init__(self, C_in, C_out, kernel_size, stride, padding, affine=True):
+    def __init__(self, C_in, C_out, kernel_size, stride, padding, shape, affine=True):
         super(SepConv, self).__init__()
         self.op = nn.Sequential(
             nn.ReLU(inplace=INPLACE),
@@ -194,7 +193,8 @@ class SepConv(nn.Module):
             nn.Conv2d(C_in, C_out, kernel_size=1, padding=0, bias=False),
             nn.BatchNorm2d(C_out, affine=affine),
         )
-    
+        self.multi_adds = 2 * (shape[0] // stride) * (shape[1] // stride) * ( kernel_size * kernel_size * C_in + C_in * C_out)
+
     def forward(self, x):
         return self.op(x)
 
@@ -230,6 +230,54 @@ class WSSepConv(nn.Module):
         return x
 
 
+class DilSepConv(nn.Module):
+    def __init__(self, C_in, C_out, kernel_size, stride, padding, dilation, shape, affine=True):
+        super(DilSepConv, self).__init__()
+        self.op = nn.Sequential(
+            nn.ReLU(inplace=False),
+            nn.Conv2d(C_in, C_in, kernel_size=kernel_size, stride=stride, padding=padding, dilation=dilation, groups=C_in, bias=False),
+            nn.Conv2d(C_in, C_out, kernel_size=1, padding=0, bias=False),
+            nn.BatchNorm2d(C_out, affine=affine),
+      )
+        self.multi_adds = (shape[0] // stride) * (shape[1] // stride) * (kernel_size * kernel_size * C_in + C_in * C_out)
+
+    def forward(self, x):
+        return self.op(x)
+
+
+class WSDilSepConv(nn.Module):
+    def __init__(self, num_possible_inputs, C_in, C_out, kernel_size, stride, padding, dilation=2, affine=True):
+        super(WSDilSepConv, self).__init__()
+        self.num_possible_inputs = num_possible_inputs
+        self.C_out = C_out
+        self.C_in = C_in
+        self.padding = padding
+        self.dilation = dilation
+        
+        self.relu = nn.ReLU(inplace=INPLACE)
+        self.W_depthwise = nn.ParameterList([nn.Parameter(torch.Tensor(C_in, 1, kernel_size, kernel_size)) for i in range(num_possible_inputs)])
+        self.W_pointwise = nn.ParameterList([nn.Parameter(torch.Tensor(C_out, C_in, 1, 1)) for i in range(num_possible_inputs)])
+        self.bn = WSBN(num_possible_inputs, C_in, affine=affine)
+    
+    def forward(self, x, x_id, stride=1, bn_train=False):
+        x = self.relu(x)
+        x = F.conv2d(x, self.W_depthwise[x_id], stride=stride, padding=self.padding, dilation=self.dilation, groups=self.C_in)
+        x = F.conv2d(x, self.W_pointwise[x_id], padding=0)
+        x = self.bn(x, x_id, bn_train=bn_train)
+
+        return x
+
+
+class AvgPool(nn.Module):
+    def __init__(self, kernel_size, stride=1, padding=0, count_include_pad=False):
+        super(AvgPool, self).__init__()
+        self.op = nn.AvgPool2d(kernel_size, stride=stride, padding=padding, count_include_pad=count_include_pad)
+        self.multi_adds = 0
+    
+    def forward(self, x):
+        return self.op(x)
+
+
 class WSAvgPool2d(nn.Module):
     def __init__(self, kernel_size, padding):
         super(WSAvgPool2d, self).__init__()
@@ -238,6 +286,16 @@ class WSAvgPool2d(nn.Module):
     
     def forward(self, x, stride):
         return F.avg_pool2d(x, self.kernel_size, stride, self.padding, count_include_pad=False)
+
+
+class MaxPool(nn.Module):
+    def __init__(self, kernel_size, stride=1, padding=0):
+        super(MaxPool, self).__init__()
+        self.op = nn.MaxPool2d(kernel_size, stride=stride, padding=padding)
+        self.multi_adds = 0
+    
+    def forward(self, x):
+        return self.op(x)
 
 
 class WSMaxPool2d(nn.Module):
@@ -253,13 +311,26 @@ class WSMaxPool2d(nn.Module):
 class Identity(nn.Module):
     def __init__(self):
         super(Identity, self).__init__()
+        self.multi_adds = 0
     
     def forward(self, x):
         return x
 
 
+class Zero(nn.Module):
+    def __init__(self, stride):
+        super(Zero, self).__init__()
+        self.stride = stride
+        self.multi_adds = 0
+
+    def forward(self, x):
+        if self.stride == 1:
+            return x.mul(0.)
+        return x[:,:,::self.stride,::self.stride].mul(0.)
+
+
 class FactorizedReduce(nn.Module):
-    def __init__(self, C_in, C_out, affine=True):
+    def __init__(self, C_in, C_out, shape, affine=True):
         super(FactorizedReduce, self).__init__()
         assert C_out % 2 == 0
         self.path1 = nn.Sequential(nn.AvgPool2d(1, stride=2, padding=0, count_include_pad=False),
@@ -267,6 +338,7 @@ class FactorizedReduce(nn.Module):
         self.path2 = nn.Sequential(nn.AvgPool2d(1, stride=2, padding=0, count_include_pad=False),
                                    nn.Conv2d(C_in, C_out // 2, 1, bias=False))
         self.bn = nn.BatchNorm2d(C_out, affine=affine)
+        self.multi_adds = 2 * 1 * 1 * C_in * C_out // 2 * (shape[0] // 2) * (shape[0] // 2)
     
     def forward(self, x, bn_train=False):
         if bn_train:
@@ -292,17 +364,17 @@ class MaybeCalibrateSize(nn.Module):
         if hw[0] != hw[1]:
             assert hw[0] == 2 * hw[1]
             self.relu = nn.ReLU(inplace=INPLACE)
-            self.preprocess_x = FactorizedReduce(c[0], channels, affine)
+            self.preprocess_x = FactorizedReduce(c[0], channels, [hw[0], hw[0], c[0]], affine)
             x_out_shape = [hw[1], hw[1], channels]
-            self.multi_adds += 1 * 1 * c[0] * channels * hw[1] * hw[1]
+            self.multi_adds += self.preprocess_x.multi_adds
         elif c[0] != channels:
-            self.preprocess_x = ReLUConvBN(c[0], channels, 1, 1, 0, affine)
+            self.preprocess_x = ReLUConvBN(c[0], channels, 1, 1, 0, [hw[0], hw[0]], affine)
             x_out_shape = [hw[0], hw[0], channels]
-            self.multi_adds += 1 * 1 * c[0] * channels * hw[1] * hw[1]
+            self.multi_adds += self.preprocess_x.multi_adds
         if c[1] != channels:
-            self.preprocess_y = ReLUConvBN(c[1], channels, 1, 1, 0, affine)
+            self.preprocess_y = ReLUConvBN(c[1], channels, 1, 1, 0, [hw[1], hw[1]], affine)
             y_out_shape = [hw[1], hw[1], channels]
-            self.multi_adds += 1 * 1 * c[1] * channels * hw[1] * hw[1]
+            self.multi_adds += self.preprocess_y.multi_adds
             
         self.out_shape = [x_out_shape, y_out_shape]
     
@@ -331,8 +403,9 @@ class FinalCombine(nn.Module):
             if hw > out_hw:
                 assert hw == 2 * out_hw and i in [0,1]
                 self.concat_fac_op_dict[i] = len(self.ops)
-                self.ops.append(FactorizedReduce(layers[i][-1], channels, affine))
-                self.multi_adds += 1 * 1 * layers[i][-1] * channels * out_hw * out_hw
+                op = FactorizedReduce(layers[i][-1], channels, [hw, hw], affine)
+                self.ops.append(op)
+                self.multi_adds += op.multi_adds
         
     def forward(self, states, bn_train=False):
         for i in self.concat:
@@ -342,23 +415,37 @@ class FinalCombine(nn.Module):
         return out
 
 
-OPERATIONS = {
-    0: SepConv, # 3x3
-    1: SepConv, # 5x5
-    2: nn.AvgPool2d, # 3x3
-    3: nn.MaxPool2d, # 3x3
-    4: Identity,
+OPERATIONS_small = {
+    0: lambda c_in, c_out, stride, shape, affine: SepConv(c_in, c_out, 3, stride, 1, shape, affine=affine),
+    1: lambda c_in, c_out, stride, shape, affine: SepConv(c_in, c_out, 5, stride, 2, shape, affine=affine),
+    2: lambda c_in, c_out, stride, shape, affine: AvgPool(3, stride, 1),
+    3: lambda c_in, c_out, stride, shape, affine: MaxPool(3, stride, 1), 
+    4: lambda c_in, c_out, stride, shape, affine: Identity() if stride == 1 else FactorizedReduce(c_in, c_out, shape, affine=affine),
 }
+
+OPERATIONS_middle = {
+    0: lambda c_in, c_out, stride, shape, affine: Zero(stride),
+    1: lambda c_in, c_out, stride, shape, affine: Identity() if stride == 1 else FactorizedReduce(c_in, c_out, shape, affine=affine),
+    2: lambda c_in, c_out, stride, shape, affine: SepConv(c_in, c_out, 3, stride, 1, shape, affine=affine),
+    3: lambda c_in, c_out, stride, shape, affine: SepConv(c_in, c_out, 5, stride, 2, shape, affine=affine),
+    4: lambda c_in, c_out, stride, shape, affine: SepConv(c_in, c_out, 7, stride, 3, shape, affine=affine),
+    5: lambda c_in, c_out, stride, shape, affine: DilSepConv(c_in, c_out, 3, stride, 2, 2, shape, affine=affine),
+    6: lambda c_in, c_out, stride, shape, affine: DilSepConv(c_in, c_out, 5, stride, 4, 2, shape, affine=affine),
+    7: lambda c_in, c_out, stride, shape, affine: DilSepConv(c_in, c_out, 7, stride, 6, 2, shape, affine=affine),
+    8: lambda c_in, c_out, stride, shape, affine: AvgPool(3, stride, 1),
+    9: lambda c_in, c_out, stride, shape, affine: MaxPool(3, stride, 1),
+}
+
 OPERATIONS_large = {
-    5: Identity,
-    6: Conv, # 1x1
-    7: Conv, # 3x3
-    8: Conv, # 1x3 + 3x1
-    9: Conv, # 1x7 + 7x1
-    10: nn.MaxPool2d, # 2x2
-    11: nn.MaxPool2d, # 3x3
-    12: nn.MaxPool2d, # 5x5
-    13: nn.AvgPool2d, # 2x2
-    14: nn.AvgPool2d, # 3x3
-    15: nn.AvgPool2d, # 5x5
+    0: lambda c_in, c_out, stride, shape, affine: Identity() if stride == 1 else FactorizedReduce(c_in, c_out, shape, affine=affine),
+    1: lambda c_in, c_out, stride, shape, affine: Conv(c_in, c_out, 1, stride, 0, shape, affine=affine),
+    2: lambda c_in, c_out, stride, shape, affine: Conv(c_in, c_out, 3, stride, 1, shape, affine=affine),
+    3: lambda c_in, c_out, stride, shape, affine: Conv(c_in, c_out, (1, 3), stride, ((0, 1), (1, 0)), shape, affine=affine),
+    4: lambda c_in, c_out, stride, shape, affine: Conv(c_in, c_out, (1, 7), stride, ((0, 3), (3, 0)), shape, affine=affine),
+    5: lambda c_in, c_out, stride, shape, affine: MaxPool(2, stride, 0), 
+    6: lambda c_in, c_out, stride, shape, affine: MaxPool(3, stride, 1), 
+    7: lambda c_in, c_out, stride, shape, affine: MaxPool(5, stride, 2), 
+    8: lambda c_in, c_out, stride, shape, affine: AvgPool(2, stride, 0),
+    9: lambda c_in, c_out, stride, shape, affine: AvgPool(3, stride, 1),
+    10: lambda c_in, c_out, stride, shape, affine: AvgPool(5, stride, 2),
 }

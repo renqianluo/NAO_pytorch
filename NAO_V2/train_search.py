@@ -28,6 +28,7 @@ parser.add_argument('--dataset', type=str, default='cifar10', choices=['cifar10,
 parser.add_argument('--zip_file', action='store_true', default=False)
 parser.add_argument('--lazy_load', action='store_true', default=False)
 parser.add_argument('--output_dir', type=str, default='models')
+parser.add_argument('--search_space', type=str, default='small', choices=['small', 'middle'])
 parser.add_argument('--seed', type=int, default=0)
 parser.add_argument('--child_batch_size', type=int, default=64)
 parser.add_argument('--child_eval_batch_size', type=int, default=500)
@@ -129,7 +130,7 @@ def build_cifar10(model_state_dict=None, optimizer_state_dict=None, **kwargs):
         sampler=torch.utils.data.sampler.SubsetRandomSampler(indices[split:num_train]),
         pin_memory=True, num_workers=16)
     
-    model = NASWSNetworkCIFAR(10, args.child_layers, args.child_nodes, args.child_channels, args.child_keep_prob, args.child_drop_path_keep_prob,
+    model = NASWSNetworkCIFAR(args, 10, args.child_layers, args.child_nodes, args.child_channels, args.child_keep_prob, args.child_drop_path_keep_prob,
                        args.child_use_aux_head, args.steps)
     model = model.cuda()
     train_criterion = nn.CrossEntropyLoss().cuda()
@@ -172,7 +173,7 @@ def build_cifar100(model_state_dict=None, optimizer_state_dict=None, **kwargs):
         sampler=torch.utils.data.sampler.SubsetRandomSampler(indices[split:num_train]),
         pin_memory=True, num_workers=16)
     
-    model = NASWSNetworkCIFAR(100, args.child_layers, args.child_nodes, args.child_channels, args.child_keep_prob, args.child_drop_path_keep_prob,
+    model = NASWSNetworkCIFAR(args, 100, args.child_layers, args.child_nodes, args.child_channels, args.child_keep_prob, args.child_drop_path_keep_prob,
                        args.child_use_aux_head, args.steps)
     model = model.cuda()
     train_criterion = nn.CrossEntropyLoss().cuda()
@@ -246,7 +247,7 @@ def build_imagenet(model_state_dict, optimizer_state_dict, **kwargs):
         sampler=torch.utils.data.sampler.SubsetRandomSampler(valid_indices),
         pin_memory=True, num_workers=16)
     
-    model = NASWSNetworkImageNet(1000, args.child_layers, args.child_nodes, args.child_channels, args.child_keep_prob,
+    model = NASWSNetworkImageNet(args, 1000, args.child_layers, args.child_nodes, args.child_channels, args.child_keep_prob,
                        args.child_drop_path_keep_prob, args.child_use_aux_head, args.steps)
     model = model.cuda()
     train_criterion = CrossEntropyLabelSmooth(1000, args.child_label_smooth).cuda()

@@ -2,12 +2,13 @@ import logging
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-from operations import WSAvgPool2d, WSMaxPool2d, WSReLUConvBN, WSBN, WSSepConv, FactorizedReduce, MaybeCalibrateSize, AuxHeadCIFAR, AuxHeadImageNet, apply_drop_path
+from operations import OPERATIONS_search_small, OPERATIONS_search_middle, WSReLUConvBN, FactorizedReduce, MaybeCalibrateSize, AuxHeadCIFAR, AuxHeadImageNet, apply_drop_path
 
 
 class Node(nn.Module):
-    def __init__(self, prev_layers, channels, stride, drop_path_keep_prob=None, node_id=0, layer_id=0, layers=0, steps=0):
+    def __init__(self, search_space, prev_layers, channels, stride, drop_path_keep_prob=None, node_id=0, layer_id=0, layers=0, steps=0):
         super(Node, self).__init__()
+        self.search_space = search_space
         self.channels = channels
         self.stride = stride
         self.drop_path_keep_prob = drop_path_keep_prob
@@ -20,80 +21,49 @@ class Node(nn.Module):
         
         num_possible_inputs = node_id + 2
         
-        # avg_pool
-        self.x_avg_pool = WSAvgPool2d(3, padding=1)
-        # max_pool
-        self.x_max_pool = WSMaxPool2d(3, padding=1)
-        # sep_conv
-        self.x_sep_conv_3 = WSSepConv(num_possible_inputs, channels, channels, 3, None, 1)
-        self.x_sep_conv_5 = WSSepConv(num_possible_inputs, channels, channels, 5, None, 2)
-        if self.stride > 1:
-            assert self.stride == 2
-            self.x_id_reduce_1 = FactorizedReduce(prev_layers[0][-1], channels)
-            self.x_id_reduce_2 = FactorizedReduce(prev_layers[1][-1], channels)
-
-        # avg_pool
-        self.y_avg_pool = WSAvgPool2d(3, padding=1)
-        # max_pool
-        self.y_max_pool = WSMaxPool2d(3, padding=1)
-        # sep_conv
-        self.y_sep_conv_3 = WSSepConv(num_possible_inputs, channels, channels, 3, None, 1)
-        self.y_sep_conv_5 = WSSepConv(num_possible_inputs, channels, channels, 5, None, 2)
-        if self.stride > 1:
-            assert self.stride == 2
-            self.y_id_reduce_1 = FactorizedReduce(prev_layers[0][-1], channels)
-            self.y_id_reduce_2 = FactorizedReduce(prev_layers[1][-1], channels)
-            
+        if search_space == 'small':
+            OPERATIONS = OPERATIONS_search_small
+        elif search_space == 'middle':
+            OPERATIONS = OPERATIONS_search_middle
+        else:
+            OPERATIONS = OPERATIONS_search_small
+        
+        for k, v in OPERATIONS.items():
+            self.x_op.append(v(num_possible_inputs, channels, channels, stride, True))
+            self.y_op.append(v(num_possible_inputs, channels, channels, stride, True))
+ 
         self.out_shape = [prev_layers[0][0]//stride, prev_layers[0][1]//stride, channels]
         
     def forward(self, x, x_id, x_op, y, y_id, y_op, step, bn_train=False):
         stride = self.stride if x_id in [0, 1] else 1
-        if x_op == 0:
-            x = self.x_sep_conv_3(x, x_id, stride, bn_train=bn_train)
-        elif x_op == 1:
-            x = self.x_sep_conv_5(x, x_id, stride, bn_train=bn_train)
-        elif x_op == 2:
-            x = self.x_avg_pool(x, stride)
-        elif x_op == 3:
-            x = self.x_max_pool(x, stride)
-        else:
-            assert x_op == 4
-            if stride > 1:
-                assert stride == 2
-                if x_id == 0:
-                    x = self.x_id_reduce_1(x, bn_train=bn_train)
-                else:
-                    x = self.x_id_reduce_2(x, bn_train=bn_train)
-
+        x = self.x_op[x_id](x, x_id, stride, bn_train)
         stride = self.stride if y_id in [0, 1] else 1
-        if y_op == 0:
-            y = self.y_sep_conv_3(y, y_id, stride, bn_train=bn_train)
-        elif y_op == 1:
-            y = self.y_sep_conv_5(y, y_id, stride, bn_train=bn_train)
-        elif y_op == 2:
-            y = self.y_avg_pool(y, stride)
-        elif y_op == 3:
-            y = self.y_max_pool(y, stride)
-        else:
-            assert y_op == 4
-            if stride > 1:
-                assert stride == 2
-                if y_id == 0:
-                    y = self.x_id_reduce_1(y, bn_train=bn_train)
-                else:
-                    y = self.x_id_reduce_2(y, bn_train=bn_train)
-         
-        if x_op != 4 and self.drop_path_keep_prob is not None and self.training:
+        y = self.y_op[y_id](y, y_id, stride, bn_train)
+        
+        X_DROP = False
+        Y_DROP = False
+        if self.search_space == 'small':
+            if x_op not in [4] and self.drop_path_keep_prob is not None and self.training:
+                X_DROP = True
+            if y_op not in [4] and self.drop_path_keep_prob is not None and self.training:
+                Y_DROP = True
+        elif self.search_space == 'middle':
+            if x_op not in [0, 1] and self.drop_path_keep_prob is not None and self.training:
+                X_DROP = True
+            if y_op not in [0, 1] and self.drop_path_keep_prob is not None and self.training:
+                Y_DROP = True
+        if X_DROP:
             x = apply_drop_path(x, self.drop_path_keep_prob, self.layer_id, self.layers, step, self.steps)
-        if y_op != 4 and self.drop_path_keep_prob is not None and self.training:
+        if Y_DROP:
             y = apply_drop_path(y, self.drop_path_keep_prob, self.layer_id, self.layers, step, self.steps)
             
         return x + y
 
 
 class Cell(nn.Module):
-    def __init__(self, prev_layers, nodes, channels, reduction, layer_id, layers, steps, drop_path_keep_prob=None):
+    def __init__(self, search_space, prev_layers, nodes, channels, reduction, layer_id, layers, steps, drop_path_keep_prob=None):
         super(Cell, self).__init__()
+        self.search_space = search_space
         assert len(prev_layers) == 2
         print(prev_layers)
         self.reduction = reduction
@@ -111,14 +81,14 @@ class Cell(nn.Module):
 
         stride = 2 if self.reduction else 1
         for i in range(self.nodes):
-            node = Node(prev_layers, channels, stride, drop_path_keep_prob, i, layer_id, layers, steps)
+            node = Node(search_space, prev_layers, channels, stride, drop_path_keep_prob, i, layer_id, layers, steps)
             self.ops.append(node)
             prev_layers.append(node.out_shape)
         out_hw = min([shape[0] for i, shape in enumerate(prev_layers)])
 
         if reduction:
-            self.fac_1 = FactorizedReduce(prev_layers[0][-1], channels)
-            self.fac_2 = FactorizedReduce(prev_layers[1][-1], channels)
+            self.fac_1 = FactorizedReduce(prev_layers[0][-1], channels, prev_layers[0])
+            self.fac_2 = FactorizedReduce(prev_layers[1][-1], channels, prev_layers[1])
         self.final_combine_conv = WSReLUConvBN(self.nodes+2, channels, channels, 1)
         
         self.out_shape = [out_hw, out_hw, channels]
@@ -150,8 +120,10 @@ class Cell(nn.Module):
     
 
 class NASWSNetworkCIFAR(nn.Module):
-    def __init__(self, classes, layers, nodes, channels, keep_prob, drop_path_keep_prob, use_aux_head, steps):
+    def __init__(self, args, classes, layers, nodes, channels, keep_prob, drop_path_keep_prob, use_aux_head, steps):
         super(NASWSNetworkCIFAR, self).__init__()
+        self.args = args
+        self.search_space = args.search_space
         self.classes = classes
         self.layers = layers
         self.nodes = nodes
@@ -178,11 +150,11 @@ class NASWSNetworkCIFAR(nn.Module):
         for i in range(self.total_layers):
             # normal cell
             if i not in self.pool_layers:
-                cell = Cell(outs, self.nodes, channels, False, i, self.total_layers, self.steps, self.drop_path_keep_prob)
+                cell = Cell(self.search_space, outs, self.nodes, channels, False, i, self.total_layers, self.steps, self.drop_path_keep_prob)
             # reduction cell
             else:
                 channels *= 2
-                cell = Cell(outs, self.nodes, channels, True, i, self.total_layers, self.steps, self.drop_path_keep_prob)
+                cell = Cell(self.search_space, outs, self.nodes, channels, True, i, self.total_layers, self.steps, self.drop_path_keep_prob)
             self.cells.append(cell)
             outs = [outs[-1], cell.out_shape]
             
@@ -202,8 +174,8 @@ class NASWSNetworkCIFAR(nn.Module):
 
     def new(self):
         model_new = NASWSNetworkCIFAR(
-            self.classes, self.layers, self.nodes, self.channels, self.keep_prob, self.drop_path_keep_prob,
-            self.use_aux_head, self.steps)
+            self.search_space, self.classes, self.layers, self.nodes, self.channels,
+            self.keep_prob, self.drop_path_keep_prob, self.use_aux_head, self.steps)
         for x, y in zip(model_new.parameters(), self.parameters()):
             x.data.copy_(y.data)
         return model_new
@@ -228,8 +200,10 @@ class NASWSNetworkCIFAR(nn.Module):
 
 
 class NASWSNetworkImageNet(nn.Module):
-    def __init__(self, classes, layers, nodes, channels, keep_prob, drop_path_keep_prob, use_aux_head, steps):
+    def __init__(self, args, classes, layers, nodes, channels, keep_prob, drop_path_keep_prob, use_aux_head, steps):
         super(NASWSNetworkImageNet, self).__init__()
+        self.args = args
+        self.search_space = args.search_space
         self.classes = classes
         self.layers = layers
         self.nodes = nodes
@@ -264,12 +238,12 @@ class NASWSNetworkImageNet(nn.Module):
         self.cells = nn.ModuleList()
         for i in range(self.total_layers):
             if i not in self.pool_layers:
-                cell = Cell(outs, self.nodes, channels, False, i, self.total_layers, self.steps,
+                cell = Cell(self.search_space, outs, self.nodes, channels, False, i, self.total_layers, self.steps,
                             self.drop_path_keep_prob)
                 outs = [outs[-1], cell.out_shape]
             else:
                 channels *= 2
-                cell = Cell(outs, self.nodes, channels, True, i, self.total_layers, self.steps,
+                cell = Cell(self.search_space, outs, self.nodes, channels, True, i, self.total_layers, self.steps,
                             self.drop_path_keep_prob)
                 outs = [outs[-1], cell.out_shape]
             self.cells.append(cell)
@@ -290,8 +264,8 @@ class NASWSNetworkImageNet(nn.Module):
     
     def new(self):
         model_new = NASWSNetworkImageNet(
-            self.classes, self.layers, self.nodes, self.channels, self.keep_prob, self.drop_path_keep_prob,
-            self.use_aux_head, self.steps)
+            self.search_space, self.classes, self.layers, self.nodes, self.channels, 
+            self.keep_prob, self.drop_path_keep_prob,self.use_aux_head, self.steps)
         for x, y in zip(model_new.parameters(), self.parameters()):
             x.data.copy_(y.data)
         return model_new
