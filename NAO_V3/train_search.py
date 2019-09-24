@@ -718,7 +718,7 @@ def main():
     args.child_num_ops = len(OPERATIONS)
     args.controller_encoder_vocab_size = 1 + ( args.child_nodes + 2 - 1 ) + args.child_num_ops
     args.controller_decoder_vocab_size = args.controller_encoder_vocab_size
-    args.steps = int(np.ceil(45000 / args.child_batch_size)) * args.child_budget
+    args.steps = int(np.ceil(45000 / args.child_batch_size)) * args.child_epochs
 
     logging.info("args = %s", args)
     
