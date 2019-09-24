@@ -17,6 +17,7 @@ import torchvision.transforms as transforms
 import torch.backends.cudnn as cudnn
 from model import NASNetworkCIFAR, NASNetworkImageNet
 from model_search import NASWSNetworkCIFAR, NASWSNetworkImageNet
+from operations import OPERATIONS_search_small, OPERATIONS_search_middle
 from controller import NAO
 
 parser = argparse.ArgumentParser(description='NAO Search')
@@ -630,7 +631,21 @@ def main():
     cudnn.enabled = True
     cudnn.benchmark = True
     cudnn.deterministic = True
+
+    if args.dataset == 'cifar10':
+        args.num_class = 10
+    elif args.dataset == 'cifar100':
+        args.num_class = 100
+    else:
+        args.num_class = 10
     
+    if args.search_space == 'small':
+        OPERATIONS = OPERATIONS_search_small
+    elif args.search_space == 'middle':
+        OPERATIONS = OPERATIONS_search_middle
+    args.child_num_ops = len(OPERATIONS)
+    args.controller_encoder_vocab_size = 1 + ( args.child_nodes + 2 - 1 ) + args.child_num_ops
+    args.controller_decoder_vocab_size = args.controller_encoder_vocab_size
     args.steps = int(np.ceil(45000 / args.child_batch_size)) * args.child_epochs
 
     logging.info("args = %s", args)
@@ -676,20 +691,20 @@ def main():
     
     if child_arch_pool is None:
         logging.info('Architecture pool is not provided, randomly generating now')
-        child_arch_pool = utils.generate_arch(args.controller_seed_arch, args.child_nodes, 5)  # [[[conv],[reduc]]]
+        child_arch_pool = utils.generate_arch(args.controller_seed_arch, args.child_nodes, args.child_num_ops)  # [[[conv],[reduc]]]
     arch_pool = []
     arch_pool_valid_acc = []
     for i in range(4):
         child_arch_pool_prob = []
         for arch in child_arch_pool:
             if args.dataset == 'cifar10':
-                tmp_model = NASNetworkCIFAR(args, 10, args.child_layers, args.child_nodes, args.child_channels, args.child_keep_prob, args.child_drop_path_keep_prob,
+                tmp_model = NASNetworkCIFAR(args, args.num_class, args.child_layers, args.child_nodes, args.child_channels, args.child_keep_prob, args.child_drop_path_keep_prob,
                     args.child_use_aux_head, args.steps, arch)
             elif args.dataset == 'cifar100':
-                tmp_model = NASNetworkCIFAR(args, 100, args.child_layers, args.child_nodes, args.child_channels, args.child_keep_prob, args.child_drop_path_keep_prob,
+                tmp_model = NASNetworkCIFAR(args, args.num_class, args.child_layers, args.child_nodes, args.child_channels, args.child_keep_prob, args.child_drop_path_keep_prob,
                     args.child_use_aux_head, args.steps, arch)
             else:
-                tmp_model = NASNetworkImageNet(args, 1000, args.child_layers, args.child_nodes, args.child_channels, args.child_keep_prob,
+                tmp_model = NASNetworkImageNet(args, args.num_class, args.child_layers, args.child_nodes, args.child_channels, args.child_keep_prob,
                     args.child_drop_path_keep_prob, args.child_use_aux_head, args.steps, arch)
             child_arch_pool_prob.append(utils.count_parameters_in_MB(tmp_model))
             del tmp_model

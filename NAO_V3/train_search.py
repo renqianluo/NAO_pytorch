@@ -350,7 +350,7 @@ def main():
     torch.cuda.manual_seed(args.seed)
     torch.cuda.manual_seed_all(args.seed)
     cudnn.enabled = True
-    cudnn.benchmark = False
+    cudnn.benchmark = True
     cudnn.deterministic = True
 
     if args.dataset == 'cifar10':
