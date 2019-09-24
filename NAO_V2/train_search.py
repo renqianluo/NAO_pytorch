@@ -695,6 +695,8 @@ def main():
     arch_pool = []
     arch_pool_valid_acc = []
     for i in range(4):
+        logging.info('Iteration %d', i)
+
         child_arch_pool_prob = []
         for arch in child_arch_pool:
             if args.dataset == 'cifar10':
@@ -718,7 +720,7 @@ def main():
             train_acc, train_obj, step = child_train(train_queue, model, optimizer, step, child_arch_pool, child_arch_pool_prob, train_criterion)
             logging.info('train_acc %f', train_acc)
 
-        # Evaluate seed archs
+        logging.info("Evaluate seed archs")
         arch_pool += child_arch_pool
         arch_pool_valid_acc = child_valid(valid_queue, model, arch_pool, eval_criterion)
 
@@ -735,7 +737,7 @@ def main():
             break
                             
         # Train Encoder-Predictor-Decoder
-        logging.info('Training Encoder-Predictor-Decoder for {} time'.format(i))
+        logging.info('Train Encoder-Predictor-Decoder')
         encoder_input = list(map(lambda x: utils.parse_arch_to_seq(x[0], 2) + utils.parse_arch_to_seq(x[1], 2), arch_pool))
         # [[conv, reduc]]
         min_val = min(arch_pool_valid_acc)

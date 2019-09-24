@@ -6,15 +6,16 @@ import logging
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-from operations import OPERATIONS_CIFAR, MaybeCalibrateSize, AuxHeadCIFAR, AuxHeadImageNet, apply_drop_path, FinalCombine
+from operations import OPERATIONS_small, OPERATIONS_middle, OPERATIONS_large, ReLUConvBN, MaybeCalibrateSize, FactorizedReduce, AuxHeadCIFAR, AuxHeadImageNet, apply_drop_path, FinalCombine
 from torch import Tensor
 import utils
-
+    
 
 class Node(nn.Module):
-    def __init__(self, x_id, x_op, y_id, y_op, x_shape, y_shape, channels, stride=1, drop_path_keep_prob=None,
+    def __init__(self, search_space, x_id, x_op, y_id, y_op, x_shape, y_shape, channels, stride=1, drop_path_keep_prob=None,
                  layer_id=0, layers=0, steps=0):
         super(Node, self).__init__()
+        self.search_space = search_space
         self.channels = channels
         self.stride = stride
         self.drop_path_keep_prob = drop_path_keep_prob
@@ -29,13 +30,22 @@ class Node(nn.Module):
         x_shape = list(x_shape)
         y_shape = list(y_shape)
         
+        if search_space == 'small':
+            OPERATIONS = OPERATIONS_small
+        elif search_space == 'middle':
+            OPERATIONS = OPERATIONS_middle
+        elif search_space == 'large':
+            OPERATIONS = OPERATIONS_large
+        else:
+            OPERATIONS = OPERATIONS_small
+
         x_stride = stride if x_id in [0, 1] else 1
-        self.x_op = OPERATIONS_CIFAR[x_op](channels, channels, x_stride, x_shape, True)
+        self.x_op = OPERATIONS[x_op](channels, channels, x_stride, x_shape, True)
         x_shape = [x_shape[0] // x_stride, x_shape[1] // x_stride, channels]
         self.multi_adds += self.x_op.multi_adds
 
         y_stride = stride if y_id in [0, 1] else 1
-        self.y_op = OPERATIONS_CIFAR[y_op](channels, channels, y_stride, y_shape, True)
+        self.y_op = OPERATIONS[y_op](channels, channels, y_stride, y_shape, True)
         y_shape = [y_shape[0] // y_stride, y_shape[1] // y_stride, channels]
         self.multi_adds += self.y_op.multi_adds
         
@@ -44,20 +54,39 @@ class Node(nn.Module):
         
     def forward(self, x, y, step):
         x = self.x_op(x)
-        if self.x_id not in [0, 1] and self.drop_path_keep_prob is not None and self.training:
-            x = apply_drop_path(x, self.drop_path_keep_prob, self.layer_id, self.layers, step, self.steps)
         y = self.y_op(y)
-        if self.y_id not in [0, 1] and self.drop_path_keep_prob is not None and self.training:
+        X_DROP = False
+        Y_DROP = False
+        if self.search_space == 'small':
+            if self.x_id not in [4] and self.drop_path_keep_prob is not None and self.training:
+                X_DROP = True
+            if self.y_id not in [4] and self.drop_path_keep_prob is not None and self.training:
+                Y_DROP = True
+        elif self.search_space == 'middle':
+            if self.x_id not in [0, 1] and self.drop_path_keep_prob is not None and self.training:
+                X_DROP = True
+            if self.y_id not in [0, 1] and self.drop_path_keep_prob is not None and self.training:
+                Y_DROP = True
+        elif self.search_space == 'large':
+            if self.x_id not in [0] and self.drop_path_keep_prob is not None and self.training:
+                X_DROP = True
+            if self.y_id not in [0] and self.drop_path_keep_prob is not None and self.training:
+                Y_DROP = True        
+
+        if X_DROP:
+            x = apply_drop_path(x, self.drop_path_keep_prob, self.layer_id, self.layers, step, self.steps)
+        if Y_DROP:
             y = apply_drop_path(y, self.drop_path_keep_prob, self.layer_id, self.layers, step, self.steps)
         out = x + y
         return out
     
 
 class Cell(nn.Module):
-    def __init__(self, arch, prev_layers, channels, reduction, layer_id, layers, steps, drop_path_keep_prob=None):
+    def __init__(self, search_space, arch, prev_layers, channels, reduction, layer_id, layers, steps, drop_path_keep_prob=None):
         super(Cell, self).__init__()
         #print(prev_layers)
         assert len(prev_layers) == 2
+        self.search_space = search_space
         self.arch = arch
         self.reduction = reduction
         self.layer_id = layer_id
@@ -79,7 +108,7 @@ class Cell(nn.Module):
         for i in range(self.nodes):
             x_id, x_op, y_id, y_op = arch[4*i], arch[4*i+1], arch[4*i+2], arch[4*i+3]
             x_shape, y_shape = prev_layers[x_id], prev_layers[y_id]
-            node = Node(x_id, x_op, y_id, y_op, x_shape, y_shape, channels, stride, drop_path_keep_prob, layer_id, layers, steps)
+            node = Node(self.search_space, x_id, x_op, y_id, y_op, x_shape, y_shape, channels, stride, drop_path_keep_prob, layer_id, layers, steps)
             self.ops.append(node)
             self.multi_adds += node.multi_adds
             self.used[x_id] += 1
@@ -109,6 +138,7 @@ class NASNetworkCIFAR(nn.Module):
     def __init__(self, args, classes, layers, nodes, channels, keep_prob, drop_path_keep_prob, use_aux_head, steps, arch):
         super(NASNetworkCIFAR, self).__init__()
         self.args = args
+        self.search_space = args.search_space
         self.classes = classes
         self.layers = layers
         self.nodes = nodes
@@ -142,10 +172,10 @@ class NASNetworkCIFAR(nn.Module):
         self.cells = nn.ModuleList()
         for i in range(self.layers+2):
             if i not in self.pool_layers:
-                cell = Cell(self.conv_arch, outs, channels, False, i, self.layers+2, self.steps, self.drop_path_keep_prob)
+                cell = Cell(self.search_space, self.conv_arch, outs, channels, False, i, self.layers+2, self.steps, self.drop_path_keep_prob)
             else:
                 channels *= 2
-                cell = Cell(self.reduc_arch, outs, channels, True, i, self.layers+2, self.steps, self.drop_path_keep_prob)
+                cell = Cell(self.search_space, self.reduc_arch, outs, channels, True, i, self.layers+2, self.steps, self.drop_path_keep_prob)
             self.multi_adds += cell.multi_adds
             self.cells.append(cell)
             outs = [outs[-1], cell.out_shape]
@@ -182,6 +212,7 @@ class NASNetworkImageNet(nn.Module):
     def __init__(self, args, classes, layers, nodes, channels, keep_prob, drop_path_keep_prob, use_aux_head, steps, arch):
         super(NASNetworkImageNet, self).__init__()
         self.args = args
+        self.search_space = args.search_space
         self.classes = classes
         self.layers = layers
         self.nodes = nodes
@@ -221,11 +252,11 @@ class NASNetworkImageNet(nn.Module):
         self.cells = nn.ModuleList()
         for i in range(self.layers + 2):
             if i not in self.pool_layers:
-                cell = Cell(self.conv_arch, outs, channels, False, i, self.layers + 2, self.steps,
+                cell = Cell(self.search_space, self.conv_arch, outs, channels, False, i, self.layers + 2, self.steps,
                             self.drop_path_keep_prob)
             else:
                 channels *= 2
-                cell = Cell(self.reduc_arch, outs, channels, True, i, self.layers + 2, self.steps,
+                cell = Cell(self.search_space, self.reduc_arch, outs, channels, True, i, self.layers + 2, self.steps,
                             self.drop_path_keep_prob)
             self.multi_adds += cell.multi_adds
             self.cells.append(cell)
