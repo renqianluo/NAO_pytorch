@@ -3,7 +3,6 @@ import sys
 import glob
 import time
 import copy
-import math
 import random
 import numpy as np
 import torch
@@ -23,6 +22,7 @@ from controller import NAO
 
 parser = argparse.ArgumentParser(description='NAO Search')
 
+# Basic model parameters.
 parser.add_argument('--mode', type=str, default='train', choices=['train', 'test'])
 parser.add_argument('--data', type=str, default='data')
 parser.add_argument('--dataset', type=str, default='cifar10', choices=['cifar10, cifar100, imagenet'])
