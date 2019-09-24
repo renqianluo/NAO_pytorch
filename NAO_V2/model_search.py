@@ -36,9 +36,9 @@ class Node(nn.Module):
         
     def forward(self, x, x_id, x_op, y, y_id, y_op, step, bn_train=False):
         stride = self.stride if x_id in [0, 1] else 1
-        x = self.x_op[x_id](x, x_id, stride, bn_train)
+        x = self.x_op[x_op](x, x_id, stride, bn_train)
         stride = self.stride if y_id in [0, 1] else 1
-        y = self.y_op[y_id](y, y_id, stride, bn_train)
+        y = self.y_op[y_op](y, y_id, stride, bn_train)
         
         X_DROP = False
         Y_DROP = False
