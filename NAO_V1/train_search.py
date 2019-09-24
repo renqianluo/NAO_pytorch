@@ -632,6 +632,20 @@ def main():
     cudnn.benchmark = True
     cudnn.deterministic = True
     
+    if args.dataset == 'cifar10':
+        args.num_class = 10
+    elif args.dataset == 'cifar100':
+        args.num_class = 100
+    else:
+        args.num_class = 10
+    
+    if args.search_space == 'small':
+        OPERATIONS = OPERATIONS_search_small
+    elif args.search_space == 'middle':
+        OPERATIONS = OPERATIONS_search_middle
+    args.child_num_ops = len(OPERATIONS)
+    args.controller_encoder_vocab_size = 1 + ( args.child_nodes + 2 - 1 ) + args.child_num_ops
+    args.controller_decoder_vocab_size = args.controller_encoder_vocab_size
     args.steps = int(np.ceil(45000 / args.child_batch_size)) * args.child_epochs
 
     logging.info("args = %s", args)

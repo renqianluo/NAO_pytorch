@@ -27,6 +27,7 @@ parser.add_argument('--data', type=str, default='data/imagenet')
 parser.add_argument('--zip_file', action='store_true', default=False)
 parser.add_argument('--lazy_load', action='store_true', default=False) # best practice: do not use lazy_load. when using zip_file, do not use lazy_load
 parser.add_argument('--output_dir', type=str, default='models')
+parser.add_argument('--search_space', type=str, default='small', choices=['small', 'middle', 'large'])
 parser.add_argument('--arch', type=str, default=None)
 parser.add_argument('--batch_size', type=int, default=32)
 parser.add_argument('--eval_batch_size', type=int, default=500)

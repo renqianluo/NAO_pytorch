@@ -200,7 +200,7 @@ class SepConv(nn.Module):
 
 
 class WSSepConv(nn.Module):
-    def __init__(self, num_possible_inputs, C_in, C_out, kernel_size, stride, padding, affine=True):
+    def __init__(self, num_possible_inputs, C_in, C_out, kernel_size, padding, affine=True):
         super(WSSepConv, self).__init__()
         self.num_possible_inputs = num_possible_inputs
         self.C_out = C_out
@@ -246,7 +246,7 @@ class DilSepConv(nn.Module):
 
 
 class WSDilSepConv(nn.Module):
-    def __init__(self, num_possible_inputs, C_in, C_out, kernel_size, stride, padding, dilation=2, affine=True):
+    def __init__(self, num_possible_inputs, C_in, C_out, kernel_size, padding, dilation=2, affine=True):
         super(WSDilSepConv, self).__init__()
         self.num_possible_inputs = num_possible_inputs
         self.C_out = C_out
@@ -284,7 +284,7 @@ class WSAvgPool2d(nn.Module):
         self.kernel_size = kernel_size
         self.padding = padding
     
-    def forward(self, x, stride):
+    def forward(self, x, x_id, stride=1, bn_train=False):
         return F.avg_pool2d(x, self.kernel_size, stride, self.padding, count_include_pad=False)
 
 
@@ -304,7 +304,7 @@ class WSMaxPool2d(nn.Module):
         self.kernel_size = kernel_size
         self.padding = padding
     
-    def forward(self, x, stride):
+    def forward(self, x, x_id, stride=1, bn_train=False):
         return F.max_pool2d(x, self.kernel_size, stride, self.padding)
 
 
@@ -314,6 +314,20 @@ class Identity(nn.Module):
         self.multi_adds = 0
     
     def forward(self, x):
+        return x
+
+
+class WSIdentity(nn.Module):
+    def __init__(self, c_in, c_out, stride, affine=True):
+        super(WSIdentity, self).__init__()
+        if stride == 2:
+            self.reduce = nn.ModuleList()
+            self.reduce.append(FactorizedReduce(c_in, c_out, [0, 0, 0], affine=affine))
+            self.reduce.append(FactorizedReduce(c_in, c_out, [0, 0, 0], affine=affine))
+
+    def forward(self, x, x_id, stride=1, bn_train=False):
+        if stride == 2:
+            return self.reduce[x_id](x, bn_train=bn_train)
         return x
 
 
@@ -329,6 +343,16 @@ class Zero(nn.Module):
         return x[:,:,::self.stride,::self.stride].mul(0.)
 
 
+class WSZero(nn.Module):
+    def __init__(self):
+        super(WSZero, self).__init__()
+
+    def forward(self, x, x_id, stride=1, bn_train=False):
+        if stride == 1:
+            return x.mul(0.)
+        return x[:,:,::stride,::stride].mul(0.)
+
+
 class FactorizedReduce(nn.Module):
     def __init__(self, C_in, C_out, shape, affine=True):
         super(FactorizedReduce, self).__init__()
@@ -338,7 +362,7 @@ class FactorizedReduce(nn.Module):
         self.path2 = nn.Sequential(nn.AvgPool2d(1, stride=2, padding=0, count_include_pad=False),
                                    nn.Conv2d(C_in, C_out // 2, 1, bias=False))
         self.bn = nn.BatchNorm2d(C_out, affine=affine)
-        self.multi_adds = 2 * 1 * 1 * C_in * C_out // 2 * (shape[0] // 2) * (shape[0] // 2)
+        self.multi_adds = 2 * 1 * 1 * C_in * C_out // 2 * (shape[0] // 2) * (shape[1] // 2)
     
     def forward(self, x, bn_train=False):
         if bn_train:
@@ -423,6 +447,16 @@ OPERATIONS_small = {
     4: lambda c_in, c_out, stride, shape, affine: Identity() if stride == 1 else FactorizedReduce(c_in, c_out, shape, affine=affine),
 }
 
+
+OPERATIONS_search_small = {
+    0: lambda n, c_in, c_out, stride, affine: WSSepConv(n, c_in, c_out, 3, 1, affine=affine),
+    1: lambda n, c_in, c_out, stride, affine: WSSepConv(n, c_in, c_out, 5, 2, affine=affine),
+    2: lambda n, c_in, c_out, stride, affine: WSAvgPool2d(3, padding=1),
+    3: lambda n, c_in, c_out, stride, affine: WSMaxPool2d(3, padding=1),
+    4: lambda n, c_in, c_out, stride, affine: WSIdentity(c_in, c_out, stride, affine=affine),
+}
+
+
 OPERATIONS_middle = {
     0: lambda c_in, c_out, stride, shape, affine: Zero(stride),
     1: lambda c_in, c_out, stride, shape, affine: Identity() if stride == 1 else FactorizedReduce(c_in, c_out, shape, affine=affine),
@@ -435,6 +469,21 @@ OPERATIONS_middle = {
     8: lambda c_in, c_out, stride, shape, affine: AvgPool(3, stride, 1),
     9: lambda c_in, c_out, stride, shape, affine: MaxPool(3, stride, 1),
 }
+
+
+OPERATIONS_search_middle = {
+    0: lambda n, c_in, c_out, stride, affine: WSZero(),
+    1: lambda n, c_in, c_out, stride, affine: WSIdentity(c_in, c_out, stride, affine=affine),
+    2: lambda n, c_in, c_out, stride, affine: WSSepConv(n, c_in, c_out, 3, 1, affine=affine),
+    3: lambda n, c_in, c_out, stride, affine: WSSepConv(n, c_in, c_out, 5, 2, affine=affine),
+    4: lambda n, c_in, c_out, stride, affine: WSSepConv(n, c_in, c_out, 7, 3, affine=affine),
+    5: lambda n, c_in, c_out, stride, affine: WSDilSepConv(n, c_in, c_out, 3, 2, 2, affine=affine),
+    6: lambda n, c_in, c_out, stride, affine: WSDilSepConv(n, c_in, c_out, 5, 4, 2, affine=affine),
+    7: lambda n, c_in, c_out, stride, affine: WSDilSepConv(n, c_in, c_out, 7, 6, 2, affine=affine),
+    8: lambda n, c_in, c_out, stride, affine: WSAvgPool2d(3, padding=1),
+    9: lambda n, c_in, c_out, stride, affine: WSMaxPool2d(3, padding=1), 
+}
+
 
 OPERATIONS_large = {
     0: lambda c_in, c_out, stride, shape, affine: Identity() if stride == 1 else FactorizedReduce(c_in, c_out, shape, affine=affine),
