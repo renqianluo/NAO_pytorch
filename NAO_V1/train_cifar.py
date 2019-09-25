@@ -24,6 +24,7 @@ parser.add_argument('--mode', type=str, default='train',
                     choices=['train', 'test'])
 parser.add_argument('--data', type=str, default='data/cifar10')
 parser.add_argument('--dataset', type=str, default='cifar10', choices=['cifar10, cifar100'])
+parser.add_argument('--autoaugment', action='store_true', default=False)
 parser.add_argument('--output_dir', type=str, default='models')
 parser.add_argument('--search_space', type=str, default='small', choices=['small', 'middle', 'large'])
 parser.add_argument('--batch_size', type=int, default=128)
@@ -117,7 +118,7 @@ def get_builder(dataset):
 def build_cifar10(model_state_dict, optimizer_state_dict, **kwargs):
     epoch = kwargs.pop('epoch')
 
-    train_transform, valid_transform = utils._data_transforms_cifar10(args.cutout_size)
+    train_transform, valid_transform = utils._data_transforms_cifar10(args.cutout_size, args.autoaugment)
     train_data = dset.CIFAR10(root=args.data, train=True, download=True, transform=train_transform)
     valid_data = dset.CIFAR10(root=args.data, train=False, download=True, transform=valid_transform)
     
