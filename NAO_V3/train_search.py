@@ -269,6 +269,14 @@ def build_imagenet(model_state_dict, optimizer_state_dict, **kwargs):
     return train_queue, valid_queue, model, train_criterion, eval_criterion, optimizer, scheduler
 
 
+def get_scheduler(optimizer, dataset):
+    if 'cifar' in dataset:
+        scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, args.child_epochs, args.child_lr_min)
+    else:
+        scheduler = torch.optim.lr_scheduler.StepLR(optimizer, args.child_decay_period, gamma=args.child_gamma)
+    return scheduler
+
+
 def child_train(train_queue, model, optimizer, global_step, arch_pool, arch_pool_prob, criterion):
     objs = utils.AvgrageMeter()
     top1 = utils.AvgrageMeter()
@@ -784,6 +792,7 @@ def main():
             del tmp_model
 
         step = 0
+        scheduler = get_scheduler(optimizer, args.dataset)
         for epoch in range(1, args.child_epochs + 1):
             scheduler.step()
             lr = scheduler.get_lr()[0]

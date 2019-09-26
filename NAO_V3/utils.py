@@ -12,6 +12,7 @@ import torch
 import torch.nn as nn
 import torch.utils.data as data
 import torchvision.transforms as transforms
+from autoaugment import CIFAR10Policy
 
 B=5
 
@@ -75,18 +76,27 @@ class Cutout(object):
         mask = mask.expand_as(img)
         img *= mask
         return img
-    
-    
-def _data_transforms_cifar10(cutout_size):
+
+
+def _data_transforms_cifar10(cutout_size, autoaugment=False):
     CIFAR_MEAN = [0.49139968, 0.48215827, 0.44653124]
     CIFAR_STD = [0.24703233, 0.24348505, 0.26158768]
 
-    train_transform = transforms.Compose([
-        transforms.RandomCrop(32, padding=4),
-        transforms.RandomHorizontalFlip(),
-        transforms.ToTensor(),
-        transforms.Normalize(CIFAR_MEAN, CIFAR_STD),
-    ])
+    if autoaugment:
+        train_transform = transforms.Compose([
+            transforms.RandomCrop(32, padding=4),
+            transforms.RandomHorizontalFlip(),
+            CIFAR10Policy(),
+            transforms.ToTensor(),
+            transforms.Normalize(CIFAR_MEAN, CIFAR_STD),
+        ])
+    else:
+        train_transform = transforms.Compose([
+            transforms.RandomCrop(32, padding=4),
+            transforms.RandomHorizontalFlip(),
+            transforms.ToTensor(),
+            transforms.Normalize(CIFAR_MEAN, CIFAR_STD),
+        ])
     if cutout_size is not None:
         train_transform.transforms.append(Cutout(cutout_size))
 
@@ -554,3 +564,15 @@ def hamming_distance(la, lb):
         line2 = lb[i]
         dis += _hamming_distance(line1, line2)
     return dis / N
+
+
+def generate_eval_points(eval_epochs, stand_alone_epoch, total_epochs):
+    if isinstance(eval_epochs, list):
+        return eval_epochs
+    assert isinstance(eval_epochs, int)
+    res = []
+    eval_point = eval_epochs - stand_alone_epoch
+    while eval_point + stand_alone_epoch <= total_epochs:
+        res.append(eval_point)
+        eval_point += eval_epochs
+    return res

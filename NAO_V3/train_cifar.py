@@ -24,7 +24,9 @@ parser.add_argument('--mode', type=str, default='train',
                     choices=['train', 'test'])
 parser.add_argument('--data', type=str, default='data/cifar10')
 parser.add_argument('--dataset', type=str, default='cifar10', choices=['cifar10, cifar100'])
+parser.add_argument('--autoaugment', action='store_true', default=False)
 parser.add_argument('--output_dir', type=str, default='models')
+parser.add_argument('--search_space', type=str, default='small', choices=['small', 'middle', 'large'])
 parser.add_argument('--batch_size', type=int, default=128)
 parser.add_argument('--eval_batch_size', type=int, default=500)
 parser.add_argument('--epochs', type=int, default=600)
@@ -37,7 +39,7 @@ parser.add_argument('--lr_max', type=float, default=0.025)
 parser.add_argument('--lr_min', type=float, default=0)
 parser.add_argument('--keep_prob', type=float, default=0.6)
 parser.add_argument('--drop_path_keep_prob', type=float, default=0.8)
-parser.add_argument('--l2_reg', type=float, default=3e-4)
+parser.add_argument('--l2_reg', type=float, default=5e-4)
 parser.add_argument('--arch', type=str, default=None)
 parser.add_argument('--use_aux_head', action='store_true', default=False)
 parser.add_argument('--seed', type=int, default=0)
@@ -116,7 +118,7 @@ def get_builder(dataset):
 def build_cifar10(model_state_dict, optimizer_state_dict, **kwargs):
     epoch = kwargs.pop('epoch')
 
-    train_transform, valid_transform = utils._data_transforms_cifar10(args.cutout_size)
+    train_transform, valid_transform = utils._data_transforms_cifar10(args.cutout_size, args.autoaugment)
     train_data = dset.CIFAR10(root=args.data, train=True, download=True, transform=train_transform)
     valid_data = dset.CIFAR10(root=args.data, train=False, download=True, transform=valid_transform)
     
@@ -199,14 +201,12 @@ def main():
         logging.info('No GPU found!')
         sys.exit(1)
     
-    random.seed(args.seed)
     np.random.seed(args.seed)
     torch.manual_seed(args.seed)
     torch.cuda.manual_seed(args.seed)
     torch.cuda.manual_seed_all(args.seed)
     cudnn.enabled = True
-    cudnn.benchmark = False
-    cudnn.deterministic = True
+    cudnn.benchmark = True
     
     args.steps = int(np.ceil(50000 / args.batch_size)) * args.epochs
     logging.info("Args = %s", args)
