@@ -33,9 +33,28 @@ To train on CIFAR-10, refer to:
 
 | Dataset | Script | GPU | Time | Checkpoint| Top1 Error Rate  |
 | ------------- | ------------- | ------------- | ------------- | ------------- | ------------- | 
-|CIFAR-10| train_NAONet_V2_36_cifar10.sh | 1 P40 | 2 days | [`Google Drive`](https://drive.google.com/file/d/1KCCw-sQ1No55aPW4m4d71UlZGCtVBR7E/view?usp=sharing) | 2.60% | 
+|CIFAR-10| train_NAONet_V2_36_cifar10.sh | 1 P40 | 2 days | [`Google Drive`](https://drive.google.com/file/d/1heEOkqiJet9Ch2_8VWWZI4VJtvOjkLaw/view?usp=sharing) | 2.60% | 
 
 by running:
 ```
 bash train_NAONet_V2_cifar10.sh
 ```
+
+### ImageNet
+To train on ImageNet, refer to:
+
+| Dataset | Script | GPU | Time | Checkpoint| Top1 Error Rate | Top5 Error Rate |
+| ------------- | ------------- | ------------- | ------------- | ------------- | ------------- | ------------- |
+|Imagenet| train_NAONet_V2_imagenet.sh | 1 P40 | 12 days | TBD | - | - |
+|Imagenet| train_NAONet_V2_imagenet_4cards.sh | 4 P40 | 6 days | TBD | - | - |
+
+To train NAONet-V2 on single GPU, run:
+```
+bash train_NAONet_V2_imagenet.sh
+```
+To train NAONet-V2 on four GPUs, run:
+```
+bash train_NAONet_V2_imagenet_4cards.sh
+```
+
+You can train imagenet on N GPUs using the ```train_NAONet_V2_imagenet.sh``` script with ```--batch_size=128*$N``` and ```--lr=0.1*$N```
