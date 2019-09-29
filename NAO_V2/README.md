@@ -33,7 +33,7 @@ To train on CIFAR-10, refer to:
 
 | Dataset | Script | GPU | Time | Checkpoint| Top1 Error Rate  |
 | ------------- | ------------- | ------------- | ------------- | ------------- | ------------- | 
-|CIFAR-10| train_NAONet_V2_36_cifar10.sh | 1 P40 | 2 days | [`Google Drive`](https://drive.google.com/file/d/1KCCw-sQ1No55aPW4m4d71UlZGCtVBR7E/view?usp=sharing) | 2.60% | 
+|CIFAR-10| train_NAONet_V2_36_cifar10.sh | 1 P40 | 2 days | [`Google Drive`](https://drive.google.com/file/d/1heEOkqiJet9Ch2_8VWWZI4VJtvOjkLaw/view?usp=sharing) | 2.60% | 
 
 by running:
 ```

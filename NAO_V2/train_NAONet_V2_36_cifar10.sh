@@ -6,7 +6,7 @@ DATA_DIR=data
 
 mkdir -p $OUTPUT_DIR
 
-fixed_arc="0 1 0 4 0 1 1 0 2 0 2 4 2 4 2 1 2 0 3 2 1 3 0 4 0 1 1 0 0 1 0 2 2 0 0 1 1 0 1 4"
+fixed_arc="1 1 0 1 2 4 0 0 0 0 2 1 0 0 0 2 0 3 0 0 0 2 0 2 2 2 1 0 0 0 0 1 0 0 0 3 0 0 0 1"
 
 python train_cifar.py \
   --data=$DATA_DIR \
