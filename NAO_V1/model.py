@@ -27,7 +27,6 @@ class Node(nn.Module):
         self.y_id = y_id
         self.y_op_id = y_op
         self.y_id_fact_reduce = None
-        self.multi_adds = 0
         x_shape = list(x_shape)
         y_shape = list(y_shape)
         
@@ -35,11 +34,9 @@ class Node(nn.Module):
         if x_op == 0:
             self.x_op = OPERATIONS[x_op](channels, channels, 3, x_stride, 1)
             x_shape = [x_shape[0] // x_stride, x_shape[1] // x_stride, channels]
-            self.multi_adds += 2 * ( 3 * 3 * channels * (x_shape[0] // x_stride) * (x_shape[1] // x_stride) + channels * channels *  (x_shape[0] // x_stride) * (x_shape[1] // x_stride))
         elif x_op == 1:
             self.x_op = OPERATIONS[x_op](channels, channels, 5, x_stride, 2)
             x_shape = [x_shape[0] // x_stride, x_shape[1] // x_stride, channels]
-            self.multi_adds += 2 * ( 5 * 5 * channels * (x_shape[0] // x_stride) * (x_shape[1] // x_stride) + channels * channels *  (x_shape[0] // x_stride) * (x_shape[1] // x_stride))
         elif x_op == 2:
             self.x_op = OPERATIONS[x_op](3, stride=x_stride, padding=1, count_include_pad=False)
             x_shape = [x_shape[0] // x_stride, x_shape[1] // x_stride, x_shape[-1]]
@@ -61,19 +58,15 @@ class Node(nn.Module):
         elif x_op == 6:
             self.x_op = OPERATIONS_large[x_op](channels, channels, 1, x_stride, 0)
             x_shape = [x_shape[0] // x_stride, x_shape[1] // x_stride, channels]
-            self.multi_adds += 1 * 1 * channels * channels * (x_shape[0] // x_stride) * (x_shape[1] // x_stride)
         elif x_op == 7:
             self.x_op = OPERATIONS_large[x_op](channels, channels, 3, x_stride, 1)
             x_shape = [x_shape[0] // x_stride, x_shape[1] // x_stride, channels]
-            self.multi_adds += 3 * 3 * channels * channels * (x_shape[0] // x_stride) * (x_shape[1] // x_stride)
         elif x_op == 8:
             self.x_op = OPERATIONS_large[x_op](channels, channels, (1,3), x_stride, ((0,1),(1,0)))
             x_shape = [x_shape[0] // x_stride, x_shape[1] // x_stride, channels]
-            self.multi_adds += 2 * 1 * 3 * channels * channels * (x_shape[0] // x_stride) * (x_shape[1] // x_stride)
         elif x_op == 9:
             self.x_op = OPERATIONS_large[x_op](channels, channels, (1,7), x_stride, ((0,3),(3,0)))
             x_shape = [x_shape[0] // x_stride, x_shape[1] // x_stride, channels]
-            self.multi_adds += 2 * 1 * 7 * channels * channels * (x_shape[0] // x_stride) * (x_shape[1] // x_stride)
         elif x_op == 10:
             self.x_op = OPERATIONS_large[x_op](2, stride=x_stride, padding=0)
             x_shape = [x_shape[0] // x_stride, x_shape[1] // x_stride, channels]
@@ -185,13 +178,11 @@ class Cell(nn.Module):
         self.ops = nn.ModuleList()
         self.nodes = len(arch) // 4
         self.used = [0] * (self.nodes + 2)
-        self.multi_adds = 0
         
         # maybe calibrate size
         prev_layers = [list(prev_layers[0]), list(prev_layers[1])]
         self.maybe_calibrate_size = MaybeCalibrateSize(prev_layers, channels)
         prev_layers = self.maybe_calibrate_size.out_shape
-        self.multi_adds += self.maybe_calibrate_size.multi_adds
 
         stride = 2 if self.reduction else 1
         for i in range(self.nodes):
@@ -199,7 +190,6 @@ class Cell(nn.Module):
             x_shape, y_shape = prev_layers[x_id], prev_layers[y_id]
             node = Node(x_id, x_op, y_id, y_op, x_shape, y_shape, channels, stride, drop_path_keep_prob, layer_id, layers, steps)
             self.ops.append(node)
-            self.multi_adds += node.multi_adds
             self.used[x_id] += 1
             self.used[y_id] += 1
             prev_layers.append(node.out_shape)
@@ -208,7 +198,6 @@ class Cell(nn.Module):
         out_hw = min([shape[0] for i, shape in enumerate(prev_layers) if i in self.concat])
         self.final_combine = FinalCombine(prev_layers, out_hw, channels, self.concat)
         self.out_shape = [out_hw, out_hw, channels * len(self.concat)]
-        self.multi_adds += self.final_combine.multi_adds
     
     def forward(self, s0, s1, step):
         s0, s1 = self.maybe_calibrate_size(s0, s1)
@@ -244,7 +233,6 @@ class NASNetworkCIFAR(nn.Module):
 
         self.pool_layers = [self.layers, 2 * self.layers + 1]
         self.layers = self.layers * 3
-        self.multi_adds = 0
         
         if self.use_aux_head:
             self.aux_head_index = self.pool_layers[-1] #+ 1
@@ -255,7 +243,6 @@ class NASNetworkCIFAR(nn.Module):
             nn.BatchNorm2d(channels)
         )
         outs = [[32, 32, channels],[32, 32, channels]]
-        self.multi_adds += 3 * 3 * 3 * channels * 32 * 32
         channels = self.channels
         self.cells = nn.ModuleList()
         for i in range(self.layers+2):
@@ -264,7 +251,6 @@ class NASNetworkCIFAR(nn.Module):
             else:
                 channels *= 2
                 cell = Cell(self.reduc_arch, outs, channels, True, i, self.layers+2, self.steps, self.drop_path_keep_prob)
-            self.multi_adds += cell.multi_adds
             self.cells.append(cell)
             outs = [outs[-1], cell.out_shape]
             
@@ -314,7 +300,6 @@ class NASNetworkImageNet(nn.Module):
         
         self.pool_layers = [self.layers, 2 * self.layers + 1]
         self.layers = self.layers * 3
-        self.multi_adds = 0
         
         if self.use_aux_head:
             self.aux_head_index = self.pool_layers[-1]
@@ -327,13 +312,11 @@ class NASNetworkImageNet(nn.Module):
             nn.Conv2d(channels // 2, channels, 3, stride=2, padding=1, bias=False),
             nn.BatchNorm2d(channels),
         )
-        self.multi_adds += 3 * 3 * 3 * channels // 2 * 112 * 112 + 3 * 3 * channels // 2 * channels * 56 * 56
         self.stem1 = nn.Sequential(
             nn.ReLU(inplace=True),
             nn.Conv2d(channels, channels, 3, stride=2, padding=1, bias=False),
             nn.BatchNorm2d(channels),
         )
-        self.multi_adds += 3 * 3 * channels * channels * 56 * 56
         outs = [[56, 56, channels], [28, 28, channels]]
         channels = self.channels
         self.cells = nn.ModuleList()
@@ -345,7 +328,6 @@ class NASNetworkImageNet(nn.Module):
                 channels *= 2
                 cell = Cell(self.reduc_arch, outs, channels, True, i, self.layers + 2, self.steps,
                             self.drop_path_keep_prob)
-            self.multi_adds += cell.multi_adds
             self.cells.append(cell)
             outs = [outs[-1], cell.out_shape]
             

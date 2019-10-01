@@ -130,7 +130,6 @@ def build_cifar10(model_state_dict, optimizer_state_dict, **kwargs):
     model = NASNetworkCIFAR(args, 10, args.layers, args.nodes, args.channels, args.keep_prob, args.drop_path_keep_prob,
                        args.use_aux_head, args.steps, args.arch)
     logging.info("param size = %fMB", utils.count_parameters_in_MB(model))
-    logging.info("multi adds = %fM", model.multi_adds / 1000000)
     if model_state_dict is not None:
         model.load_state_dict(model_state_dict)
     

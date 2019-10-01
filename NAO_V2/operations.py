@@ -86,7 +86,6 @@ class ReLUConvBN(nn.Module):
         self.relu = nn.ReLU(inplace=INPLACE)
         self.conv = nn.Conv2d(C_in, C_out, kernel_size, stride=stride, padding=padding, bias=False)
         self.bn = nn.BatchNorm2d(C_out, affine=affine)
-        self.multi_adds = C_in * C_out * kernel_size * kernel_size * (shape[0] // stride) * (shape[0] // stride)
     
     def forward(self, x, bn_train=False):
         x = self.relu(x)
@@ -106,7 +105,6 @@ class Conv(nn.Module):
                 nn.Conv2d(C_in, C_out, kernel_size, stride=stride, padding=padding, bias=False),
                 nn.BatchNorm2d(C_out, affine=affine)
             )
-            self.multi_adds = kernel_size * kernel_size * C_in * C_out * (shape[0] // stride) * (shape[0] // stride)
         else:
             assert isinstance(kernel_size, tuple)
             k1, k2 = kernel_size[0], kernel_size[1]
@@ -118,7 +116,6 @@ class Conv(nn.Module):
                 nn.Conv2d(C_out, C_out, (k2, k1), stride=(stride, 1), padding=padding[1], bias=False),
                 nn.BatchNorm2d(C_out, affine=affine),
             )
-            self.multi_adds = 2 * k1 * k2 * C_in * C_out * (shape[0] // stride) * (shape[0] // stride)
 
     def forward(self, x):
         x = self.ops(x)
@@ -193,8 +190,7 @@ class SepConv(nn.Module):
             nn.Conv2d(C_in, C_out, kernel_size=1, padding=0, bias=False),
             nn.BatchNorm2d(C_out, affine=affine),
         )
-        self.multi_adds = 2 * (shape[0] // stride) * (shape[1] // stride) * ( kernel_size * kernel_size * C_in + C_in * C_out)
-
+       
     def forward(self, x):
         return self.op(x)
 
@@ -239,8 +235,7 @@ class DilSepConv(nn.Module):
             nn.Conv2d(C_in, C_out, kernel_size=1, padding=0, bias=False),
             nn.BatchNorm2d(C_out, affine=affine),
       )
-        self.multi_adds = (shape[0] // stride) * (shape[1] // stride) * (kernel_size * kernel_size * C_in + C_in * C_out)
-
+        
     def forward(self, x):
         return self.op(x)
 
@@ -272,7 +267,6 @@ class AvgPool(nn.Module):
     def __init__(self, kernel_size, stride=1, padding=0, count_include_pad=False):
         super(AvgPool, self).__init__()
         self.op = nn.AvgPool2d(kernel_size, stride=stride, padding=padding, count_include_pad=count_include_pad)
-        self.multi_adds = 0
     
     def forward(self, x):
         return self.op(x)
@@ -292,7 +286,6 @@ class MaxPool(nn.Module):
     def __init__(self, kernel_size, stride=1, padding=0):
         super(MaxPool, self).__init__()
         self.op = nn.MaxPool2d(kernel_size, stride=stride, padding=padding)
-        self.multi_adds = 0
     
     def forward(self, x):
         return self.op(x)
@@ -311,7 +304,6 @@ class WSMaxPool2d(nn.Module):
 class Identity(nn.Module):
     def __init__(self):
         super(Identity, self).__init__()
-        self.multi_adds = 0
     
     def forward(self, x):
         return x
@@ -335,7 +327,6 @@ class Zero(nn.Module):
     def __init__(self, stride):
         super(Zero, self).__init__()
         self.stride = stride
-        self.multi_adds = 0
 
     def forward(self, x):
         if self.stride == 1:
@@ -362,7 +353,6 @@ class FactorizedReduce(nn.Module):
         self.path2 = nn.Sequential(nn.AvgPool2d(1, stride=2, padding=0, count_include_pad=False),
                                    nn.Conv2d(C_in, C_out // 2, 1, bias=False))
         self.bn = nn.BatchNorm2d(C_out, affine=affine)
-        self.multi_adds = 2 * 1 * 1 * C_in * C_out // 2 * (shape[0] // 2) * (shape[1] // 2)
     
     def forward(self, x, bn_train=False):
         if bn_train:
@@ -378,7 +368,6 @@ class MaybeCalibrateSize(nn.Module):
     def __init__(self, layers, channels, affine=True):
         super(MaybeCalibrateSize, self).__init__()
         self.channels = channels
-        self.multi_adds = 0
         hw = [layer[0] for layer in layers]
         c = [layer[-1] for layer in layers]
         
@@ -390,15 +379,12 @@ class MaybeCalibrateSize(nn.Module):
             self.relu = nn.ReLU(inplace=INPLACE)
             self.preprocess_x = FactorizedReduce(c[0], channels, [hw[0], hw[0], c[0]], affine)
             x_out_shape = [hw[1], hw[1], channels]
-            self.multi_adds += self.preprocess_x.multi_adds
         elif c[0] != channels:
             self.preprocess_x = ReLUConvBN(c[0], channels, 1, 1, 0, [hw[0], hw[0]], affine)
             x_out_shape = [hw[0], hw[0], channels]
-            self.multi_adds += self.preprocess_x.multi_adds
         if c[1] != channels:
             self.preprocess_y = ReLUConvBN(c[1], channels, 1, 1, 0, [hw[1], hw[1]], affine)
             y_out_shape = [hw[1], hw[1], channels]
-            self.multi_adds += self.preprocess_y.multi_adds
             
         self.out_shape = [x_out_shape, y_out_shape]
     
@@ -421,7 +407,6 @@ class FinalCombine(nn.Module):
         self.concat = concat
         self.ops = nn.ModuleList()
         self.concat_fac_op_dict = {}
-        self.multi_adds = 0
         for i in concat:
             hw = layers[i][0]
             if hw > out_hw:
@@ -429,7 +414,6 @@ class FinalCombine(nn.Module):
                 self.concat_fac_op_dict[i] = len(self.ops)
                 op = FactorizedReduce(layers[i][-1], channels, [hw, hw], affine)
                 self.ops.append(op)
-                self.multi_adds += op.multi_adds
         
     def forward(self, states, bn_train=False):
         for i in self.concat:

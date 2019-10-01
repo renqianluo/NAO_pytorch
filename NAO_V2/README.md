@@ -43,10 +43,9 @@ bash train_NAONet_V2_cifar10.sh
 ### ImageNet
 To train on ImageNet, refer to:
 
-| Dataset | Script | GPU | Time | Checkpoint| Top1 Error Rate | Top5 Error Rate |
+| Dataset | Script | Checkpoint| Top1 Error Rate | Top5 Error Rate |
 | ------------- | ------------- | ------------- | ------------- | ------------- | ------------- | ------------- |
-|Imagenet| train_NAONet_V2_imagenet.sh | 1 P40 | 12 days | TBD | - | - |
-|Imagenet| train_NAONet_V2_imagenet_4cards.sh | 4 P40 | 6 days | TBD | - | - |
+|Imagenet| train_NAONet_V2_imagenet_4cards.sh | [`Google Drive`](https://drive.google.com/file/d/1ZQbNwz1CdEYRSZraWXyBNAoi3R-O1j60/view?usp=sharing) | 25.5 | 8.2 |
 
 To train NAONet-V2 on single GPU, run:
 ```

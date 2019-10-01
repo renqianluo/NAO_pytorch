@@ -282,7 +282,6 @@ class MaybeCalibrateSize(nn.Module):
     def __init__(self, layers, channels, affine=True):
         super(MaybeCalibrateSize, self).__init__()
         self.channels = channels
-        self.multi_adds = 0
         hw = [layer[0] for layer in layers]
         c = [layer[-1] for layer in layers]
         
@@ -294,15 +293,12 @@ class MaybeCalibrateSize(nn.Module):
             self.relu = nn.ReLU(inplace=INPLACE)
             self.preprocess_x = FactorizedReduce(c[0], channels, affine)
             x_out_shape = [hw[1], hw[1], channels]
-            self.multi_adds += 1 * 1 * c[0] * channels * hw[1] * hw[1]
         elif c[0] != channels:
             self.preprocess_x = ReLUConvBN(c[0], channels, 1, 1, 0, affine)
             x_out_shape = [hw[0], hw[0], channels]
-            self.multi_adds += 1 * 1 * c[0] * channels * hw[1] * hw[1]
         if c[1] != channels:
             self.preprocess_y = ReLUConvBN(c[1], channels, 1, 1, 0, affine)
             y_out_shape = [hw[1], hw[1], channels]
-            self.multi_adds += 1 * 1 * c[1] * channels * hw[1] * hw[1]
             
         self.out_shape = [x_out_shape, y_out_shape]
     
@@ -325,14 +321,12 @@ class FinalCombine(nn.Module):
         self.concat = concat
         self.ops = nn.ModuleList()
         self.concat_fac_op_dict = {}
-        self.multi_adds = 0
         for i in concat:
             hw = layers[i][0]
             if hw > out_hw:
                 assert hw == 2 * out_hw and i in [0,1]
                 self.concat_fac_op_dict[i] = len(self.ops)
                 self.ops.append(FactorizedReduce(layers[i][-1], channels, affine))
-                self.multi_adds += 1 * 1 * layers[i][-1] * channels * out_hw * out_hw
         
     def forward(self, states, bn_train=False):
         for i in self.concat:
