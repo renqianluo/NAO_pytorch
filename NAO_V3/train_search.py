@@ -839,11 +839,14 @@ def main():
         nao = train_nao(nao, all_encoder_input, all_encoder_target)
         logging.info('Finish training EPD')
 
+
         # Generate new archs
         new_archs = []
         max_step_size = 50
         predict_step_size = 0
-        top100_archs = list(map(lambda x: utils.parse_arch_to_seq(x[0]) + utils.parse_arch_to_seq(x[1]), arch_pool[:100]))
+        # get top 100 from true data and synthetic data
+        top100_indices = np.argsort(all_encoder_target)[:100]
+        top100_archs = all_encoder_input[top100_indices]
         nao_infer_dataset = utils.NAODataset(top100_archs, None, False)
         nao_infer_queue = torch.utils.data.DataLoader(
             nao_infer_dataset, batch_size=len(nao_infer_dataset), shuffle=False, pin_memory=True)
