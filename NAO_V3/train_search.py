@@ -314,22 +314,25 @@ def child_train(train_queue, model, optimizer, global_step, arch_pool, arch_pool
 
 def child_valid(valid_queue, model, arch_pool, criterion):
     valid_acc_list = []
+    top1 = utils.AvgrageMeter()
     with torch.no_grad():
         model.eval()
         for i, arch in enumerate(arch_pool):
-            # for step, (input, target) in enumerate(valid_queue):
-            inputs, targets = next(iter(valid_queue))
-            inputs = inputs.cuda()
-            targets = targets.cuda()
-                
-            logits, _ = model(inputs, arch, bn_train=True)
-            loss = criterion(logits, targets)
-                
-            prec1, prec5 = utils.accuracy(logits, targets, topk=(1, 5))
-            valid_acc_list.append(prec1.data/100)
-            
-            if (i+1) % 100 == 0:
-                logging.info('Valid arch %s\n loss %.2f top1 %f top5 %f', ' '.join(map(str, arch[0] + arch[1])), loss, prec1, prec5)
+            top1.reset()
+            for step, (inputs, target) in enumerate(valid_queue):
+                #inputs, targets = next(iter(valid_queue))
+                inputs = inputs.cuda()
+                targets = targets.cuda()
+                    
+                logits, _ = model(inputs, arch, bn_train=True)
+                loss = criterion(logits, targets)
+                    
+                prec1, prec5 = utils.accuracy(logits, targets, topk=(1, 5))
+                n = inputs.size(0)
+                top1.update(prec1.data, n)
+
+            valid_acc_list.append(top1.avg/100)
+            #logging.info('Valid arch %s\n loss %.2f top1 %f top5 %f', ' '.join(map(str, arch[0] + arch[1])), loss, prec1, prec5)
         
     return valid_acc_list
 
@@ -803,7 +806,8 @@ def main():
     
         logging.info("Evaluate seed archs")
         arch_pool += child_arch_pool
-        arch_pool_valid_acc = child_valid(valid_queue, model, arch_pool, eval_criterion)
+        #arch_pool_valid_acc = child_valid(valid_queue, model, arch_pool, eval_criterion)
+        arch_pool_valid_acc += child_valid(valid_queue, model, child_arch_pool, eval_criterion)
 
         arch_pool_valid_acc_sorted_indices = np.argsort(arch_pool_valid_acc)[::-1]
         arch_pool = list(map(lambda x:arch_pool[x], arch_pool_valid_acc_sorted_indices))
