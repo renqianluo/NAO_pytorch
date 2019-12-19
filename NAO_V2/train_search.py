@@ -25,7 +25,7 @@ parser = argparse.ArgumentParser(description='NAO Search')
 # Basic model parameters.
 parser.add_argument('--mode', type=str, default='train', choices=['train', 'test'])
 parser.add_argument('--data', type=str, default='data')
-parser.add_argument('--dataset', type=str, default='cifar10', choices=['cifar10, cifar100, imagenet'])
+parser.add_argument('--dataset', type=str, default='cifar10', choices=['cifar10', 'cifar100', 'imagenet'])
 parser.add_argument('--zip_file', action='store_true', default=False)
 parser.add_argument('--lazy_load', action='store_true', default=False)
 parser.add_argument('--output_dir', type=str, default='models')
