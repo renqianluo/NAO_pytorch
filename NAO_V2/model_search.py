@@ -225,7 +225,7 @@ class NASWSNetworkImageNet(nn.Module):
             nn.BatchNorm2d(channels // 2),
             nn.ReLU(inplace=False),
             nn.Conv2d(channels // 2, channels, 3, stride=2, padding=1, bias=False),
-            nn.BatchNorm2d(channels // 2),
+            nn.BatchNorm2d(channels),
         )
         
         self.stem1 = nn.Sequential(
