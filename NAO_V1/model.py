@@ -58,19 +58,19 @@ class Node(nn.Module):
         X_DROP = False
         Y_DROP = False
         if self.search_space == 'small':
-            if self.x_id not in [4] and self.drop_path_keep_prob is not None and self.training:
+            if self.x_op not in [4] and self.drop_path_keep_prob is not None and self.training:
                 X_DROP = True
-            if self.y_id not in [4] and self.drop_path_keep_prob is not None and self.training:
+            if self.y_op not in [4] and self.drop_path_keep_prob is not None and self.training:
                 Y_DROP = True
         elif self.search_space == 'middle':
-            if self.x_id not in [0, 1] and self.drop_path_keep_prob is not None and self.training:
+            if self.x_op not in [0, 1] and self.drop_path_keep_prob is not None and self.training:
                 X_DROP = True
-            if self.y_id not in [0, 1] and self.drop_path_keep_prob is not None and self.training:
+            if self.y_op not in [0, 1] and self.drop_path_keep_prob is not None and self.training:
                 Y_DROP = True
         elif self.search_space == 'large':
-            if self.x_id not in [0] and self.drop_path_keep_prob is not None and self.training:
+            if self.x_op not in [0] and self.drop_path_keep_prob is not None and self.training:
                 X_DROP = True
-            if self.y_id not in [0] and self.drop_path_keep_prob is not None and self.training:
+            if self.y_op not in [0] and self.drop_path_keep_prob is not None and self.training:
                 Y_DROP = True        
 
         if X_DROP:
