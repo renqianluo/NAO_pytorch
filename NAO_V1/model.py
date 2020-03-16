@@ -151,14 +151,14 @@ class Node(nn.Module):
         x = self.x_op(x)
         if self.x_id_fact_reduce is not None:
             x = self.x_id_fact_reduce(x)
-        if self.x_id not in [4, 5] and self.drop_path_keep_prob is not None and self.training:
+        if self.drop_path_keep_prob is not None and self.training:
             x = apply_drop_path(x, self.drop_path_keep_prob, self.layer_id, self.layers, step, self.steps)
         if self.y_op_id in [10, 13]:
             y = F.pad(y, [0, 1, 0, 1])
         y = self.y_op(y)
         if self.y_id_fact_reduce is not None:
             y = self.y_id_fact_reduce(y)
-        if self.y_id not in [4, 5] and self.drop_path_keep_prob is not None and self.training:
+        if self.drop_path_keep_prob is not None and self.training:
             y = apply_drop_path(y, self.drop_path_keep_prob, self.layer_id, self.layers, step, self.steps)
         out = x + y
         return out

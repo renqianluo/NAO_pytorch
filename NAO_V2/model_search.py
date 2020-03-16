@@ -43,14 +43,14 @@ class Node(nn.Module):
         X_DROP = False
         Y_DROP = False
         if self.search_space == 'small':
-            if x_op not in [4] and self.drop_path_keep_prob is not None and self.training:
+            if self.drop_path_keep_prob is not None and self.training:
                 X_DROP = True
-            if y_op not in [4] and self.drop_path_keep_prob is not None and self.training:
+            if self.drop_path_keep_prob is not None and self.training:
                 Y_DROP = True
         elif self.search_space == 'middle':
-            if x_op not in [0, 1] and self.drop_path_keep_prob is not None and self.training:
+            if self.drop_path_keep_prob is not None and self.training:
                 X_DROP = True
-            if y_op not in [0, 1] and self.drop_path_keep_prob is not None and self.training:
+            if self.drop_path_keep_prob is not None and self.training:
                 Y_DROP = True
         if X_DROP:
             x = apply_drop_path(x, self.drop_path_keep_prob, self.layer_id, self.layers, step, self.steps)

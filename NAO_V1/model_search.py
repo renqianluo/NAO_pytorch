@@ -83,9 +83,9 @@ class Node(nn.Module):
                 else:
                     y = self.x_id_reduce_2(y, bn_train=bn_train)
          
-        if x_op != 4 and self.drop_path_keep_prob is not None and self.training:
+        if self.drop_path_keep_prob is not None and self.training:
             x = apply_drop_path(x, self.drop_path_keep_prob, self.layer_id, self.layers, step, self.steps)
-        if y_op != 4 and self.drop_path_keep_prob is not None and self.training:
+        if self.drop_path_keep_prob is not None and self.training:
             y = apply_drop_path(y, self.drop_path_keep_prob, self.layer_id, self.layers, step, self.steps)
             
         return x + y
