@@ -9,7 +9,7 @@ The library currently contains following sub-libraries:
 Released with the paper [Neural Architecture Optimization](https://arxiv.org/abs/1808.07233), by [Renqian Luo](http://home.ustc.edu.cn/~lrq)\*, [Fei Tian](https://ustctf.github.io/)\*, [Tao Qin](https://www.microsoft.com/en-us/research/people/taoqin/), [En-Hong Chen](http://staff.ustc.edu.cn/~cheneh/), [Tie-Yan Liu](https://www.microsoft.com/en-us/research/people/tyliu/). *=equal contribution
 
 ## NAO-V2
-Released with the paper [Understanding and Improving One-shot Neural Architecture Optimization], by [Renqian Luo](http://home.ustc.edu.cn/~lrq), [Tao Qin](https://www.microsoft.com/en-us/research/people/taoqin/), [En-Hong Chen](http://staff.ustc.edu.cn/~cheneh/)
+Released with the paper [Balanced One-shot Neural Architecture Optimization](https://arxiv.org/abs/1909.10815), by [Renqian Luo](http://home.ustc.edu.cn/~lrq), [Tao Qin](https://www.microsoft.com/en-us/research/people/taoqin/), [En-Hong Chen](http://staff.ustc.edu.cn/~cheneh/)
 
 
 ## License
